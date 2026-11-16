@@ -149,11 +149,11 @@ class CausalVocabulary:
 
 @dataclass(frozen=True, eq=False, kw_only=True)
 class CausalRule(Axiom):
-    """因果規則 ``φ ⊃ Caused(F(t⃗), v, σ)``
+    """因果規則 ``φ ⊃ Caused(F(t1, ..., tn), v, σ)``
 
     Attributes:
         vocabulary: Caused を含む語彙
-        fluent: フルエントの項 F(t⃗) (変数を含んでよい)
+        fluent: フルエントの項 F(t1, ..., tn) (変数を含んでよい)
         value: 真理値 v
         situation: 状況項 σ (静的な規則では変数 s，動的な規則では do(A(…), s) など)
         condition: 条件 φ
@@ -172,7 +172,7 @@ class CausalRule(Axiom):
 
     @property
     def consequent(self) -> Formula:
-        """``Caused(F(t⃗), v, σ)``"""
+        """``Caused(F(t1, ..., tn), v, σ)``"""
         return self.vocabulary.caused(self.fluent, self.value, self.situation)
 
     @property
@@ -189,15 +189,15 @@ class CausalRule(Axiom):
         return f"{show(self.condition)} ⊃ {show(self.consequent, shorthand=False)}"
 
     def case(self, params: Sequence[DomainObject], v: TruthValue, s: Situation) -> Formula:
-        """補完の 1 項: ``∃(残りの変数). u⃗ = t⃗ ∧ v = value ∧ s = σ ∧ φ``
+        """補完の 1 項: ``∃(残りの変数). (u1, ..., un) = (t1, ..., tn) ∧ v = value ∧ s = σ ∧ φ``
 
         t_i や σ が (まだ使っていない) 自由変数なら u_i や s に名前を付け替え
         そうでなければ等式を加える (Reiter の手続きの正規化と同じ)．残りの変数は
-        補完の自由変数 (u⃗, v, s) と衝突しないよう s' のようにプライムを付けて存在量化する
+        補完の自由変数 (u1, ..., un, v, s) と衝突しないよう s' のようにプライムを付けて存在量化する
         規則側の項への置き換えは同時に 1 回だけ行う (変数の捕獲を避けるため)
 
         Args:
-            params: 補完の変数 u⃗ (F の引数)
+            params: 補完の変数 u1, ..., un (F の引数)
             v: 補完の変数 v
             s: 補完の変数 s
 
@@ -284,10 +284,10 @@ def completion(vocabulary: CausalVocabulary, rules: Sequence[CausalRule]) -> tup
 
     各フルエント記号 F について:
 
-        ∀x⃗, v, s. Caused(F(x⃗), v, s) ≡ ⋁ (F についての各規則の項)
+        ∀x1, ..., xn, v, s. Caused(F(x1, ..., xn), v, s) ≡ ⋁ (F についての各規則の項)
 
     フルエントのデータ型は領域閉包を満たすので，記号ごとの補完の連言は Caused 全体の
-    補完と同値．規則のない記号 F については ¬Caused(F(x⃗), v, s)
+    補完と同値．規則のない記号 F については ¬Caused(F(x1, ..., xn), v, s)
 
     Args:
         vocabulary: Caused を含む語彙

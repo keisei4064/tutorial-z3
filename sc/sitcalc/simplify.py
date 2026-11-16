@@ -10,9 +10,9 @@
 後継状態公理には ``∃x, y. a = move(x, y) ∧ φ(x, y)`` のような式が現れる
 行動のデータ型では (一意名公理と領域閉包により)
 
-    ∃x⃗. a = A(x⃗) ∧ φ(x⃗)   ≡   is_A(a) ∧ φ(A₁(a), ..., Aₙ(a))
+    ∃x1, ..., xn. a = A(x1, ..., xn) ∧ φ(x1, ..., xn)   ≡   is_A(a) ∧ φ(A₁(a), ..., Aₙ(a))
 
-が成り立つ (A_i はアクセサ: a = A(x⃗) なら A_i(a) = x_i)．再帰関数の本体に量化子が
+が成り立つ (A_i はアクセサ: a = A(x1, ..., xn) なら A_i(a) = x_i)．再帰関数の本体に量化子が
 残ると Z3 の探索が極端に遅くなる (再帰の展開が量化子の中で止まる) ので
 :class:`sc.sitcalc.theory.CompiledTheory` を作るときにこの書き換えを行う
 公理版 (BasicActionTheory.entails) では本書の形のまま使う
@@ -27,7 +27,10 @@ from sc.sitcalc.language import Formula, as_formula
 
 
 def eliminate_constructor_quantifiers(phi: Formula) -> Formula:
-    """``∃x⃗. t = C(x⃗) ∧ ψ`` を ``is_C(t) ∧ ψ[x⃗ := C⃗(t)]`` に書き換える
+    """構成子についての存在量化子を消去する
+
+    ``∃x1, ..., xn. t = C(x1, ..., xn) ∧ ψ`` を ``is_C(t) ∧ ψ[x1 := C1(t), ..., xn := Cn(t)]``
+    に書き換える
 
     Args:
         phi: 論理式
@@ -71,7 +74,7 @@ def _has_vars(e: z3.ExprRef) -> bool:
 
 
 def _try_eliminate(q: z3.QuantifierRef) -> z3.BoolRef | None:
-    """``∃x⃗. ... ∧ t = C(x⃗) ∧ ...`` の形なら存在量化子を消去する
+    """``∃x1, ..., xn. ... ∧ t = C(x1, ..., xn) ∧ ...`` の形なら存在量化子を消去する
 
     Args:
         q: 量化子の式

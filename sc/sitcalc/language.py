@@ -417,7 +417,7 @@ class FunctionSymbol:
             t: 項
 
         Returns:
-            論理式 ``∃x⃗. t = C(x⃗)`` (Z3 の認識子)
+            論理式 ``∃x1, ..., xn. t = C(x1, ..., xn)`` (Z3 の認識子)
         """
         return as_formula(self.recognizer(t.expr))
 
@@ -428,7 +428,7 @@ class FunctionSymbol:
             t: 項
 
         Returns:
-            ``t = C(x⃗)`` のときの x⃗ (Z3 のアクセサの適用)
+            ``t = C(x1, ..., xn)`` のときの x1, ..., xn (Z3 のアクセサの適用)
         """
         return tuple(
             sort.lift(acc(t.expr)) for sort, acc in zip(self.params, self.accessors, strict=True)
@@ -462,7 +462,7 @@ class ActionSymbol(FunctionSymbol):
         return Action(self._apply(args))
 
     def recognize(self, a: Action) -> Formula:
-        """``∃x⃗. a = A(x⃗)`` を作る (Z3 の認識子 ``is_A(a)``)
+        """``∃x1, ..., xn. a = A(x1, ..., xn)`` を作る (Z3 の認識子 ``is_A(a)``)
 
         Args:
             a: 行動の項
@@ -473,7 +473,7 @@ class ActionSymbol(FunctionSymbol):
         return self._recognize(a)
 
     def arguments(self, a: Action) -> tuple[DomainObject, ...]:
-        """``a = A(x⃗)`` のときの x⃗ を作る (Z3 のアクセサ)
+        """``a = A(x1, ..., xn)`` のときの x1, ..., xn を作る (Z3 のアクセサ)
 
         Args:
             a: 行動の項
@@ -500,7 +500,7 @@ class FluentSymbol(FunctionSymbol):
         return Fluent(self._apply(args))
 
     def recognize(self, p: Fluent) -> Formula:
-        """``∃x⃗. p = F(x⃗)`` を作る (Z3 の認識子 ``is_F(p)``)
+        """``∃x1, ..., xn. p = F(x1, ..., xn)`` を作る (Z3 の認識子 ``is_F(p)``)
 
         Args:
             p: フルエントの項
@@ -511,7 +511,7 @@ class FluentSymbol(FunctionSymbol):
         return self._recognize(p)
 
     def arguments(self, p: Fluent) -> tuple[DomainObject, ...]:
-        """``p = F(x⃗)`` のときの x⃗ を作る (Z3 のアクセサ)
+        """``p = F(x1, ..., xn)`` のときの x1, ..., xn を作る (Z3 のアクセサ)
 
         Args:
             p: フルエントの項

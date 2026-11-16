@@ -47,10 +47,10 @@ from sc.sitcalc.pretty import show
 
 
 def forall(variables: Sequence[Term], body: Formula) -> Formula:
-    """全称閉包 ``∀x⃗. body`` を作る
+    """全称閉包 ``∀x1, ..., xn. body`` を作る
 
     Args:
-        variables: 量化する変数 x⃗
+        variables: 量化する変数 x1, ..., xn
         body: 本体
 
     Returns:
@@ -298,22 +298,22 @@ class SuccessorStateAxiom(Axiom):
 
     @property
     def variables(self) -> tuple[Term, ...]:
-        """自由変数 x⃗, a, s"""
+        """自由変数 x1, ..., xn, a, s"""
         return (*self.params, self.action, self.situation)
 
     @property
     def lhs(self) -> Formula:
-        """左辺 ``F(x⃗, do(a, s))``"""
+        """左辺 ``F(x1, ..., xn, do(a, s))``"""
         lang = self.language
         return lang.holds(self.fluent(*self.params), lang.do(self.action, self.situation))
 
     @property
     def formula(self) -> Formula:
-        """``∀x⃗, a, s. F(x⃗, do(a, s)) ≡ Φ_F(x⃗, a, s)``"""
+        """``∀x1, ..., xn, a, s. F(x1, ..., xn, do(a, s)) ≡ Φ_F(x1, ..., xn, a, s)``"""
         return forall(self.variables, self.lhs == self.phi)
 
     def statement(self) -> str:
-        """``F(x⃗, do(a, s)) ≡ Φ_F(x⃗, a, s)`` (自由変数は暗黙に全称量化)
+        """``F(x1, ..., xn, do(a, s)) ≡ Φ_F(x1, ..., xn, a, s)`` (自由変数は暗黙に全称量化)
 
         Returns:
             表示用の文字列
@@ -323,15 +323,17 @@ class SuccessorStateAxiom(Axiom):
     def instantiate(
         self, args: Sequence[DomainObject], action: Action, situation: Situation
     ) -> Formula:
-        """``Φ_F(t⃗, α, σ)``: 回帰 (§16.3 p.665) で ``F(t⃗, do(α, σ))`` を置き換える式
+        """``Φ_F(t1, ..., tn, α, σ)`` を作る
+
+        回帰 (§16.3 p.665) で ``F(t1, ..., tn, do(α, σ))`` を置き換える式
 
         Args:
-            args: x⃗ に入れる項 t⃗
+            args: x1, ..., xn に入れる項 t1, ..., tn
             action: a に入れる行動の項 α
             situation: s に入れる状況の項 σ
 
         Returns:
-            論理式 ``Φ_F(t⃗, α, σ)``
+            論理式 ``Φ_F(t1, ..., tn, α, σ)``
         """
         return instantiate(self.phi, self.variables, [*args, action, situation])
 
@@ -371,21 +373,21 @@ class ActionPreconditionAxiom(Axiom):
 
     @property
     def variables(self) -> tuple[Term, ...]:
-        """自由変数 x⃗, s"""
+        """自由変数 x1, ..., xn, s"""
         return (*self.params, self.situation)
 
     @property
     def lhs(self) -> Formula:
-        """左辺 ``Poss(A(x⃗), s)``"""
+        """左辺 ``Poss(A(x1, ..., xn), s)``"""
         return self.language.poss(self.action_symbol(*self.params), self.situation)
 
     @property
     def formula(self) -> Formula:
-        """``∀x⃗, s. Poss(A(x⃗), s) ≡ Π_A(x⃗, s)``"""
+        """``∀x1, ..., xn, s. Poss(A(x1, ..., xn), s) ≡ Π_A(x1, ..., xn, s)``"""
         return forall(self.variables, self.lhs == self.pi)
 
     def statement(self) -> str:
-        """``Poss(A(x⃗), s) ≡ Π_A(x⃗, s)``
+        """``Poss(A(x1, ..., xn), s) ≡ Π_A(x1, ..., xn, s)``
 
         Returns:
             表示用の文字列
@@ -393,14 +395,14 @@ class ActionPreconditionAxiom(Axiom):
         return f"{show(self.lhs)} ≡ {show(self.pi)}"
 
     def instantiate(self, args: Sequence[DomainObject], situation: Situation) -> Formula:
-        """``Π_A(t⃗, σ)`` を作る
+        """``Π_A(t1, ..., tn, σ)`` を作る
 
         Args:
-            args: x⃗ に入れる項 t⃗
+            args: x1, ..., xn に入れる項 t1, ..., tn
             situation: s に入れる状況の項 σ
 
         Returns:
-            論理式 ``Π_A(t⃗, σ)``
+            論理式 ``Π_A(t1, ..., tn, σ)``
         """
         return instantiate(self.pi, self.variables, [*args, situation])
 
@@ -435,7 +437,7 @@ class InitialAxiom(Axiom):
 class InitialFluentDefinition(Axiom):
     """D_S0 の文のうち，あるフルエントの S0 での真偽を完全に定めるもの
 
-        ∀x⃗. F(x⃗, S0) ≡ ψ_F(x⃗)
+        ∀x1, ..., xn. F(x1, ..., xn, S0) ≡ ψ_F(x1, ..., xn)
 
     全フルエントについてこの形の文があるとき D_S0 は「完全」で
     D の Holds は状況の木の上で一意に決まる (帰納法 (16.63) による)
@@ -444,8 +446,8 @@ class InitialFluentDefinition(Axiom):
     Attributes:
         language: 言語
         fluent: フルエントの関数記号 F
-        params: 変数 x⃗
-        body: ψ_F(x⃗) (S0 で uniform)
+        params: 変数 x1, ..., xn
+        body: ψ_F(x1, ..., xn) (S0 で uniform)
     """
 
     language: SitCalcLanguage
@@ -464,16 +466,16 @@ class InitialFluentDefinition(Axiom):
 
     @property
     def lhs(self) -> Formula:
-        """``F(x⃗, S0)``"""
+        """``F(x1, ..., xn, S0)``"""
         return self.language.holds(self.fluent(*self.params), self.language.s0)
 
     @property
     def formula(self) -> Formula:
-        """``∀x⃗. F(x⃗, S0) ≡ ψ_F(x⃗)``"""
+        """``∀x1, ..., xn. F(x1, ..., xn, S0) ≡ ψ_F(x1, ..., xn)``"""
         return forall(self.params, self.lhs == self.body)
 
     def statement(self) -> str:
-        """``F(x⃗, S0) ≡ ψ_F(x⃗)``
+        """``F(x1, ..., xn, S0) ≡ ψ_F(x1, ..., xn)``
 
         Returns:
             表示用の文字列
@@ -481,13 +483,13 @@ class InitialFluentDefinition(Axiom):
         return f"{show(self.lhs)} ≡ {show(self.body)}"
 
     def instantiate(self, args: Sequence[DomainObject]) -> Formula:
-        """``ψ_F(t⃗)`` を作る
+        """``ψ_F(t1, ..., tn)`` を作る
 
         Args:
-            args: x⃗ に入れる項 t⃗
+            args: x1, ..., xn に入れる項 t1, ..., tn
 
         Returns:
-            論理式 ``ψ_F(t⃗)``
+            論理式 ``ψ_F(t1, ..., tn)``
         """
         return instantiate(self.body, self.params, args)
 
@@ -501,8 +503,11 @@ def closed_initial_database(
 ) -> tuple[InitialFluentDefinition, ...]:
     """「列挙したフルエントだけが S0 で真」という完全な D_S0 を作る (閉世界仮定)
 
-    各フルエント記号 F について ``∀x⃗. F(x⃗, S0) ≡ ⋁ (x⃗ = c⃗)`` を作る
-    ここで c⃗ は true_fluents に現れる F(c⃗) の引数
+    各フルエント記号 F について次の文を作る::
+
+        ∀x1, ..., xn. F(x1, ..., xn, S0) ≡ ⋁ ((x1, ..., xn) = (c1, ..., cn))
+
+    ここで c1, ..., cn は true_fluents に現れる F(c1, ..., cn) の引数
 
     Args:
         language: 言語

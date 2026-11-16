@@ -250,13 +250,15 @@ D_AP: tuple[ActionPreconditionAxiom, ...] = (
 
 
 class ActionSpec:
-    """(16.5)–(16.24) の 1 つ: ∀x⃗, s. φ(do(A(x⃗), s)) (自由変数は u, v と行動の引数)
+    """(16.5)–(16.24) の 1 つ
+
+    ∀x1, ..., xn, s. φ(do(A(x1, ..., xn), s)) (自由変数は u, v と行動の引数)
 
     Attributes:
         ref: 本書の式番号
-        action: 行動の項 A(x⃗) (Poss の前提に使う)
+        action: 行動の項 A(x1, ..., xn) (Poss の前提に使う)
         variables: 自由変数 (s 以外)
-        body: 式の本体 φ(do(A(x⃗), s)) (自由変数を含む)
+        body: 式の本体 φ(do(A(x1, ..., xn), s)) (自由変数を含む)
     """
 
     def __init__(self, ref: str, action: Action, variables: Sequence[Block], body: Formula) -> None:
@@ -264,7 +266,7 @@ class ActionSpec:
 
         Args:
             ref: 本書の式番号
-            action: 行動の項 A(x⃗)
+            action: 行動の項 A(x1, ..., xn)
             variables: 自由変数 (s 以外)
             body: 式の本体
         """
@@ -381,8 +383,8 @@ def _eff(
 
     Args:
         ref: 本書の式番号
-        fluent: フルエントの項 F(t⃗)
-        action: 行動の項 A(r⃗)
+        fluent: フルエントの項 F(t1, ..., tn)
+        action: 行動の項 A(r1, ..., rn)
         variables: 自由変数 (s 以外)
         positive: F を真にするなら True，偽にするなら False
 
@@ -709,7 +711,7 @@ def run() -> ExampleTrace:  # noqa: C901, PLR0915
     for d in derivations:
         for eff, gamma in (*d.positive, *d.negative):
             sign = "" if eff.positive else "¬"
-            args = "u⃗, " if d.fluent.arity else ""
+            args = "".join(f"{u}, " for u in d.ssa.params)
             r.formula(
                 f"{eff.ref} → γ(a, {args}s) ⊃ {sign}{d.fluent.name}({args}do(a, s)) の γ",
                 gamma,
@@ -787,7 +789,7 @@ def run() -> ExampleTrace:  # noqa: C901, PLR0915
         rows.append([spec.ref, show(spec.body), plain.verdict.value, cond_result])
     r.table(
         "D_ss ∪ D_ap ⊨ (16.5)–(16.24) ?",
-        ["式", "内容", "無条件", "Poss(A(x⃗), s) ∧ 状態制約 のもとで"],
+        ["式", "内容", "無条件", "Poss(A(x1, ..., xn), s) ∧ 状態制約 のもとで"],
         rows,
     )
     r.text(

@@ -433,7 +433,7 @@ class BasicActionTheory:
     def holds_cases(self, p: Fluent, a: Action, s: Situation) -> Formula:
         """``Holds(p, do(a, s))`` と同値な式 (p の構成子で場合分けした Φ_F)
 
-        フルエントのデータ型は領域閉包を満たす (p はいずれかの F(x⃗) に等しい) ので
+        フルエントのデータ型は領域閉包を満たす (p はいずれかの F(x1, ..., xn) に等しい) ので
         D_ss から ``∀p, a, s. Holds(p, do(a, s)) ≡ holds_cases(p, a, s)`` が従う
 
         Args:
@@ -496,7 +496,8 @@ class BasicActionTheory:
     def one_step_instances(self, a: Action, s: Situation) -> tuple[Formula, ...]:
         """D_ss と D_ap の，状況 s と do(a, s) での具体例 (量化子なし)
 
-        - 各基礎的なフルエント F(c⃗) について ``F(c⃗, do(a, s)) ≡ Φ_F(c⃗, a, s)``
+        - 各基礎的なフルエント F(c1, ..., cn) について
+          ``F(c1, ..., cn, do(a, s)) ≡ Φ_F(c1, ..., cn, a, s)``
         - ``Poss(a, s) ≡ Π(a, s)`` (行動の構成子での場合分け)
 
         いずれも D の公理から (全称例化とデータ型の領域閉包で) 従う．したがって

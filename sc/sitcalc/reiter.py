@@ -4,16 +4,17 @@
 
 1. 各効果公理を次のどちらかの形に書き換える (p.655):
 
-       γ(a, x⃗, s) ⊃ F(x⃗, do(a, s))
-       γ(a, x⃗, s) ⊃ ¬F(x⃗, do(a, s))
+       γ(a, x1, ..., xn, s) ⊃ F(x1, ..., xn, do(a, s))
+       γ(a, x1, ..., xn, s) ⊃ ¬F(x1, ..., xn, do(a, s))
 
    例: (16.34) ¬clear(y, do(stack(x, y), s)) は (∃y) a = stack(y, x) ⊃ ¬clear(x, do(a, s))
-   (本書 p.655．この実装ではフルエントの引数を u⃗ と書く)
+   (本書 p.655．この実装ではフルエントの引数を u1, ..., un と書く)
 
 2. フルエント F について，正の γ を γ⁺₁ ... γ⁺ₘ，負の γ を γ⁻₁ ... γ⁻ₙ とし
    因果的完全性の仮定 (causal completeness assumption) のもとで (16.50):
 
-       F(x⃗, do(a, s)) ≡ γ⁺(a, x⃗, s) ∨ (F(x⃗, s) ∧ ¬γ⁻(a, x⃗, s))
+       F(x1, ..., xn, do(a, s)) ≡ γ⁺(a, x1, ..., xn, s)
+                                  ∨ (F(x1, ..., xn, s) ∧ ¬γ⁻(a, x1, ..., xn, s))
 
    ただし γ⁺ = γ⁺₁ ∨ ... ∨ γ⁺ₘ, γ⁻ = γ⁻₁ ∨ ... ∨ γ⁻ₙ
 
@@ -44,18 +45,18 @@ from sc.sitcalc.pretty import show
 
 @dataclass(frozen=True, eq=False, kw_only=True)
 class EffectAxiom(Axiom):
-    """効果公理 (effect axiom): ``φ(x⃗, s) ⊃ (¬)F(t⃗, do(A(r⃗), s))``
+    """効果公理 (effect axiom): ``φ(x1, ..., xn, s) ⊃ (¬)F(t1, ..., tn, do(A(r1, ..., rn), s))``
 
     本書 (16.32)–(16.49) は条件 φ のない形 (φ = true)．条件付きの例は (16.30)
 
     Attributes:
         language: 言語
         positive: F を真にする (True) か偽にする (False) か
-        fluent: フルエントの項 F(t⃗) (変数を含んでよい)
-        action: 行動の項 A(r⃗) (変数を含んでよい)
+        fluent: フルエントの項 F(t1, ..., tn) (変数を含んでよい)
+        action: 行動の項 A(r1, ..., rn) (変数を含んでよい)
         situation: 状況の変数 s
-        variables: s 以外の自由変数 x⃗ (すべて列挙する)
-        condition: 条件 φ(x⃗, s) (s で uniform)．None なら true
+        variables: s 以外の自由変数 x1, ..., xn (すべて列挙する)
+        condition: 条件 φ(x1, ..., xn, s) (s で uniform)．None なら true
 
     """
 
@@ -78,14 +79,14 @@ class EffectAxiom(Axiom):
 
     @property
     def consequent(self) -> Formula:
-        """``(¬)F(t⃗, do(A(r⃗), s))``"""
+        """``(¬)F(t1, ..., tn, do(A(r1, ..., rn), s))``"""
         lang = self.language
         atom = lang.holds(self.fluent, lang.do(self.action, self.situation))
         return atom if self.positive else z3.Not(atom)
 
     @property
     def formula(self) -> Formula:
-        """``∀x⃗, s. φ ⊃ (¬)F(t⃗, do(A(r⃗), s))``"""
+        """``∀x1, ..., xn, s. φ ⊃ (¬)F(t1, ..., tn, do(A(r1, ..., rn), s))``"""
         body = (
             self.consequent
             if self.condition is None
@@ -104,21 +105,24 @@ class EffectAxiom(Axiom):
         return f"{show(self._condition)} ⊃ {show(self.consequent)}"
 
     def normal_form(self, params: Sequence[DomainObject], a: Action, s: Situation) -> Formula:
-        """γ(a, u⃗, s): この効果公理を ``γ(a, u⃗, s) ⊃ (¬)F(u⃗, do(a, s))`` の形にしたときの γ
+        """この効果公理を正規形にしたときの γ(a, u1, ..., un, s) を作る
 
-        F(t⃗) の引数 t_i が (まだ使っていない) 変数なら u_i に名前を付け替え
+        正規形は ``γ(a, u1, ..., un, s) ⊃ (¬)F(u1, ..., un, do(a, s))``
+
+        F(t1, ..., tn) の引数 t_i が (まだ使っていない) 変数なら u_i に名前を付け替え
         そうでなければ等式 u_i = t_i を加える．残った変数は存在量化する
 
         Args:
-            params: SSA の変数 u⃗ (F の引数)
+            params: SSA の変数 u1, ..., un (F の引数)
             a: SSA の変数 a
             s: SSA の変数 s
 
         Returns:
-            γ(a, u⃗, s)
+            γ(a, u1, ..., un, s)
 
         Raises:
-            ValueError: u⃗ の個数が F の引数と合わない，または効果公理の変数と名前が衝突するとき
+            ValueError: u1, ..., un の個数が F の引数と合わない
+                または効果公理の変数と名前が衝突するとき
         """
         sym = self.language.fluent_symbol_of(self.fluent)
         args = [DomainObject(as_datatype_term(c)) for c in self.fluent.expr.children()]
@@ -127,7 +131,7 @@ class EffectAxiom(Axiom):
             raise ValueError(msg)
         clash = {v.expr.hash() for v in self.variables} & {u.expr.hash() for u in params}
         if clash:
-            msg = "効果公理の変数と SSA の変数 u⃗ の名前が衝突している"
+            msg = "効果公理の変数と SSA の変数 u1, ..., un の名前が衝突している"
             raise ValueError(msg)
 
         renamed: list[Term] = []
@@ -146,7 +150,7 @@ class EffectAxiom(Axiom):
                 equalities.append((u, t))
 
         def rename(phi: Formula) -> Formula:
-            """効果公理側の変数を u⃗ と s に付け替える
+            """効果公理側の変数を u1, ..., un と s に付け替える
 
             Args:
                 phi: 効果公理側の論理式
@@ -178,7 +182,7 @@ class ReiterDerivation:
         gamma_plus: γ⁺ = γ⁺₁ ∨ ... ∨ γ⁺ₘ
         gamma_minus: γ⁻ = γ⁻₁ ∨ ... ∨ γ⁻ₙ
         ssa: 結果の後継状態公理 (16.50)
-        consistency: 整合性の仮定 ``∀u⃗, a, s. ¬(γ⁺ ∧ γ⁻)`` (p.656)
+        consistency: 整合性の仮定 ``∀u1, ..., un, a, s. ¬(γ⁺ ∧ γ⁻)`` (p.656)
     """
 
     fluent: FluentSymbol
@@ -207,7 +211,7 @@ def successor_state_axiom(
         language: 言語
         fluent: フルエント記号 F
         effects: 効果公理 (F 以外のものは無視する)
-        params: SSA の変数 u⃗ (F の引数)
+        params: SSA の変数 u1, ..., un (F の引数)
         action: SSA の変数 a
         situation: SSA の変数 s
         ref: 出典

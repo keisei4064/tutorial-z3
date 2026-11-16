@@ -6,10 +6,10 @@ S0 で uniform な式 ``φ'(S0)`` に変換する:
     D ⊨ φ(do([α1, ..., αn], S0))   iff   D_una ∪ D_S0 ⊨ φ'(S0)
 
 関数フルエントがない場合の定義 (p.664–665): φ(S0) の回帰は φ(S0)
-φ(do(α, σ)) の回帰は，各関係フルエントの原子 F(t⃗, do(α, σ)) を
-Φ_F(t⃗, α, σ) (SSA (16.66) の右辺) で置き換えた式の回帰
+φ(do(α, σ)) の回帰は，各関係フルエントの原子 F(t1, ..., tn, do(α, σ)) を
+Φ_F(t1, ..., tn, α, σ) (SSA (16.66) の右辺) で置き換えた式の回帰
 
-実装: 「F(t⃗, do(α, σ)) を Φ_F(t⃗, α, σ) に置き換える」一段分を，Z3 の
+実装: 「F(t1, ..., tn, do(α, σ)) を Φ_F(t1, ..., tn, α, σ) に置き換える」一段分を，Z3 の
 ``substitute_funs`` で Holds を次の λ 式に置き換えることで行う:
 
     λp, s. if s = do(a', s') then Φ(p, a', s') else Holds(p, s)
@@ -44,7 +44,9 @@ MAX_STEPS = 64
 
 
 def expand_poss(theory: BasicActionTheory, phi: Formula) -> Formula:
-    """Poss(A(t⃗), σ) を行動前提条件公理の右辺 Π_A(t⃗, σ) で置き換える (p.665 の手順 2)
+    """Poss の原子を行動前提条件公理の右辺で置き換える (p.665 の手順 2)
+
+    Poss(A(t1, ..., tn), σ) を Π_A(t1, ..., tn, σ) にする
 
     Args:
         theory: 基本行動理論
@@ -96,7 +98,7 @@ def _needs_regression(theory: BasicActionTheory, phi: Formula) -> bool:
 
 
 def regress_once(theory: BasicActionTheory, phi: Formula) -> Formula:
-    """回帰を一段だけ行う: F(t⃗, do(α, σ)) を Φ_F(t⃗, α, σ) に置き換えて simplify
+    """回帰を一段だけ行う: F(t1, ..., tn, do(α, σ)) を Φ_F(t1, ..., tn, α, σ) に置き換えて simplify
 
     Args:
         theory: 基本行動理論

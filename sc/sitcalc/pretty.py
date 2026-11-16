@@ -3,7 +3,8 @@
 本書の記法 (§16.1 以降) に寄せる:
 
 - 結合子は ``∧ ∨ ¬ ⊃ ≡``，量化子は ``∀x. φ`` / ``∃x. φ`` (p.656 の書き方)
-- ``Holds(F(t⃗), s)`` は ``F(t⃗, s)`` と略記する (p.651: "we often write clear(x, s) ...
+- ``Holds(F(t1, ..., tn), s)`` は ``F(t1, ..., tn, s)`` と略記する
+  (p.651: "we often write clear(x, s) ...
   which as we mentioned earlier, is just a shorthand for Holds(clear(x), s)")
 - ``¬(x = y)`` は ``x ≠ y``
 
@@ -21,7 +22,7 @@ def show(e: z3.ExprRef, *, shorthand: bool = True) -> str:
 
     Args:
         e: Z3 の式
-        shorthand: ``Holds(F(t⃗), s)`` を ``F(t⃗, s)`` と略記するか
+        shorthand: ``Holds(F(t1, ..., tn), s)`` を ``F(t1, ..., tn, s)`` と略記するか
 
     Returns:
         本書の記法の文字列 (例: ``clear(u, do(a, s)) ≡ a = putdown(u) ∨ …``)
