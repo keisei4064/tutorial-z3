@@ -233,6 +233,7 @@ def run() -> ExampleTrace:
     )
 
     r.section("2. プランニング: Sussman の異常", "§16.4")
+    # 初期状況から反復深化で最短プランを探す
     compiled = BAT.compile()
     evaluator = compiled.evaluator()
     r.text("初期状況:\n" + towers_text(state_trace(evaluator.state(S0))))
@@ -250,6 +251,7 @@ def run() -> ExampleTrace:
         expected="3 手 (例 2 の stack/unstack/pickup/putdown 版では 6 手)",
         ref="§16.4",
     )
+    # 各手の状態を表示し，見つけたプランを公理版でも検証する
     if plan is not None:
         sit = S0
         for i, act in enumerate(plan, start=1):
@@ -272,6 +274,7 @@ def run() -> ExampleTrace:
             }
         )
 
+    # 前提条件に x ≠ y がないと，自分自身の上に移動できてしまう
     r.section("3. 注意: (16.25) には x ≠ y がない", "(16.25)")
     r.expect_entailment(
         "D ⊨ Poss(move(B, B), S0)",

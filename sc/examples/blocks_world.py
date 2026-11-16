@@ -707,6 +707,7 @@ def run() -> ExampleTrace:  # noqa: C901, PLR0915
     # 2 -----------------------------------------------------------------------
     r.section("2. Reiter の手続き: 効果公理から後継状態公理へ", "§16.2.1, (16.32)–(16.50)")
     r.axiom_list("効果公理", "(16.32)–(16.49)", EFFECT_AXIOMS)
+    # 各効果公理の条件 γ と，それらをまとめた後継状態公理を表示する
     derivations = derive_successor_state_axioms()
     for d in derivations:
         for eff, gamma in (*d.positive, *d.negative):
@@ -718,6 +719,7 @@ def run() -> ExampleTrace:  # noqa: C901, PLR0915
                 "p.655",
             )
         r.formula(f"{d.fluent.name} の後継状態公理", d.ssa.statement(), "(16.50)")
+    # 導いた clear の公理と本書の式を比較する
     clear_ssa = next(d.ssa for d in derivations if d.fluent.name == "clear")
     r.expect_entailment(
         "作った clear の後継状態公理は p.656 のものと同値",
@@ -730,6 +732,7 @@ def run() -> ExampleTrace:  # noqa: C901, PLR0915
     # 3 -----------------------------------------------------------------------
     r.section("3. 整合性の仮定 ¬(γ⁺ ∧ γ⁻)", "p.656")
     generic = basic_action_theory("ブロック世界 (D_S0 なし)")
+    # まず無条件で調べ，clear については実行可能性と状態制約を加えて調べる
     for d in derivations:
         unconditional = entails([], d.consistency)
         expected = Verdict.NOT_ENTAILED if d.fluent.name == "clear" else Verdict.ENTAILED
@@ -772,6 +775,7 @@ def run() -> ExampleTrace:  # noqa: C901, PLR0915
         [Sentence(ref=ref, sentence=phi, display=text) for ref, text, phi in state_constraints(s)],
         note="p.657 の 4 つ以外は、本書のフルエントの説明 (p.649–650) を式にしたもの",
     )
+    # 各仕様を無条件で調べ，成り立たなければ Poss と状態制約を加える
     rows: list[list[str]] = []
     needs_condition: list[str] = []
     for spec in ACTION_SPECS:
@@ -796,6 +800,7 @@ def run() -> ExampleTrace:  # noqa: C901, PLR0915
         "「無条件」が unknown の式は、量化子を含む理論の反例モデルを Z3 が作れなかったもの。"
         "状態制約に反する初期状況 (A と B を同時に持っている) を与えると、具体的な反例が得られる:"
     )
+    # 状態制約を破る初期状況を作り，2 つの式の具体的な反例を確認する
     odd = basic_action_theory(
         "ブロック世界 (状態制約に反する初期状況)",
         closed_initial_database(LANG, [holding(A), holding(B), ontable(C), clear(C)], ref="—"),
@@ -840,6 +845,7 @@ def run() -> ExampleTrace:  # noqa: C901, PLR0915
     )
     r.expect_entailment("D ⊨ 状態制約(S0)", bat.entails(constraints(S0)), Verdict.ENTAILED)
 
+    # 行動列の各前提条件を展開・回帰し，初期状況から確かめる
     sequence = [stack(A, B), pickup(C), putdown(C)]
     r.text("p.665: 行動列 [stack(A, B), pickup(C), putdown(C)] は S0 で実行可能か。")
     conds = executability_conditions(bat, sequence)
@@ -861,6 +867,7 @@ def run() -> ExampleTrace:  # noqa: C901, PLR0915
         Verdict.ENTAILED,
         ref="p.665",
     )
+    # 同じ行動列の後に成り立つ状態を，回帰と直接の推論で確かめる
     final = LANG.do_sequence(sequence)
     projection = z3.And(
         holds(on(A, B), final),
@@ -883,6 +890,7 @@ def run() -> ExampleTrace:  # noqa: C901, PLR0915
         "直接: D ⊨ 射影の問い", bat.entails(projection), Verdict.ENTAILED, ref="p.664"
     )
 
+    # 比較として，最初の行動から実行できない行動列も調べる
     bad = [pickup(C), pickup(B)]
     bad_conds = z3.And(*executability_conditions(bat, bad))
     r.expect_entailment(
@@ -935,6 +943,7 @@ def run() -> ExampleTrace:  # noqa: C901, PLR0915
     planning_bat = basic_action_theory("ブロック世界 (Sussman の異常)", SUSSMAN_INITIAL)
     r.axiom_list("D_S0", "—", planning_bat.d_s0)
     r.formula("ゴール", sussman_goal(LANG.situation_var("s")), "p.666")
+    # 初期状況から反復深化で最短プランを探す
     compiled = planning_bat.compile()
     evaluator = compiled.evaluator()
     r.text("初期状況:\n" + towers_text(state_trace(evaluator.state(S0))))
@@ -952,6 +961,7 @@ def run() -> ExampleTrace:  # noqa: C901, PLR0915
         expected="6 手",
         ref="§16.4",
     )
+    # 見つけたプランの各状態を表示し，公理版でも検証する
     if plan is not None:
         sit = S0
         for i, act in enumerate(plan, start=1):

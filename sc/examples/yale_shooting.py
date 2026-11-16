@@ -276,6 +276,29 @@ def _narrative_values(truth: Callable[[Formula], bool]) -> list[str]:
     return cells
 
 
+# 画面に出す説明文
+EFFECT_ONLY_NOTE = (
+    "効果公理は「変わるもの」しか述べず、"
+    "「変わらないもの」(wait で loaded が保たれる等) を述べていない"
+)
+CIRCUMSCRIPTION_NOTE = (
+    "(16.28) の abnormal をサーカムスクリプションで最小化する (Holds は可変)。Z3 では二階の"
+    "サーカムスクリプションを直接扱えないので、Hanks–McDermott と同じく物語の遷移"
+    " S0 -load→ S1 -wait→ S2 -shoot→ S3 での基礎例に制限し、abnormal の原子の集合が"
+    "包含について極小なモデルを列挙する。"
+)
+BOOK_FRAME_NOTE = (
+    "(16.28) は真の持続しか述べないので、dead が F→T に変わるのに abnormal は要らない。"
+    "abnormal が空のモデル (loaded が保たれ shoot で dead) が唯一の極小モデル"
+)
+HANKS_MCDERMOTT_NOTE = (
+    "ab(loaded, wait, S1) を含む方が Hanks–McDermott の直観に反するモデル: "
+    "wait が abnormal に弾を抜き (loaded(S2) = F)、"
+    "shoot の効果 ab(dead, shoot, S2) を避けている"
+)
+CLOSURE_NOTE = "行動は load, wait, shoot だけ (領域閉包) なので、行動ごとの仕様から SSA が従う"
+
+
 def run() -> ExampleTrace:
     """例題を実行する
 
@@ -287,102 +310,153 @@ def run() -> ExampleTrace:
     """
     r = Report("yale_shooting", "例 1: Yale Shooting Problem とフレーム問題", "§16.2 (p.652–656)")
 
-    # 1. 効果公理だけ ---------------------------------------------------------
+    _check_effect_axioms_only(r)
+    _check_circumscription(r)
+    _check_complete_specification(r)
+    bat = _build_by_reiter(r)
+    _check_basic_action_theory(r, bat)
+
+    return r.finish()
+
+
+def _check_effect_axioms_only(r: Report) -> None:
+    """1. 効果公理だけでは問いが帰結しないこと (フレーム問題) を確かめる
+
+    Args:
+        r: 出力先のレポート
+    """
     r.section("1. 効果公理だけでは帰結しない (フレーム問題)", "(16.29)–(16.31)")
     r.axiom_list("効果公理と初期状態", "(16.29)–(16.31)", [*EFFECT_AXIOMS, INITIAL])
     r.formula("問い", GOAL)
-    effect_only = entails([e.formula for e in EFFECT_AXIOMS] + [INITIAL.formula], GOAL)
+
+    # 効果公理と初期状態だけを前提にして問いを聞く
+    premises = [e.formula for e in EFFECT_AXIOMS] + [INITIAL.formula]
+    effect_only = entails(premises, GOAL)
     r.expect_entailment(
         "効果公理だけから dead(do(shoot, do(wait, do(load, S0)))) が従うか",
         effect_only,
         Verdict.NOT_ENTAILED,
         ref="p.653",
-        detail=(
-            "効果公理は「変わるもの」しか述べず、"
-            "「変わらないもの」(wait で loaded が保たれる等) を述べていない"
-        ),
+        detail=EFFECT_ONLY_NOTE,
     )
-    if effect_only.countermodel is not None:
-        m = effect_only.countermodel
 
-        def truth_m(phi: Formula) -> bool:
-            """反例モデルでの論理式の真偽
+    # 反例モデルで，物語の各状況のフルエントの値を見る
+    model = effect_only.countermodel
+    if model is None:
+        return
 
-            Args:
-                phi: 論理式
+    def truth_m(phi: Formula) -> bool:
+        """反例モデルでの論理式の真偽
 
-            Returns:
-                真なら True
-            """
-            return z3.is_true(m.eval(phi, model_completion=True))
+        Args:
+            phi: 論理式
 
-        r.table(
-            "反例モデル (物語の各状況でのフルエントの値)",
-            [n for n, _ in NARRATIVE],
-            [_narrative_values(truth_m)],
-        )
+        Returns:
+            真なら True
+        """
+        return z3.is_true(model.eval(phi, model_completion=True))
 
-    # 2. (16.28) + サーカムスクリプション ---------------------------------------
+    r.table(
+        "反例モデル (物語の各状況でのフルエントの値)",
+        [n for n, _ in NARRATIVE],
+        [_narrative_values(truth_m)],
+    )
+
+
+def _check_circumscription(r: Report) -> None:
+    """2. 一般フレーム公理 (16.28) と abnormal の最小化
+
+    本書どおりの定式化と Hanks–McDermott の定式化の 2 通りで，極小モデルを列挙する
+
+    Args:
+        r: 出力先のレポート
+    """
     r.section("2. 一般フレーム公理 (16.28) と abnormal の最小化", "(16.28), p.653–654")
-    r.text(
-        "(16.28) の abnormal をサーカムスクリプションで最小化する (Holds は可変)。Z3 では二階の"
-        "サーカムスクリプションを直接扱えないので、Hanks–McDermott と同じく物語の遷移"
-        " S0 -load→ S1 -wait→ S2 -shoot→ S3 での基礎例に制限し、abnormal の原子の集合が"
-        "包含について極小なモデルを列挙する。"
-    )
-    loaded_s2 = holds(loaded, S2)
-    for effects_abnormal, label, n_expected in (
-        (False, "(a) 本書どおり: (16.28) + (16.29)–(16.31)", 1),
-        (True, "(b) Hanks–McDermott: 効果公理が「その変化は abnormal」とも述べる", 2),
-    ):
-        premises, atoms, names = _circumscription_premises(effects_abnormal=effects_abnormal)
-        models = sorted(
-            minimal_models(premises, atoms), key=lambda mm: [names[j] for j in mm.true_atoms]
-        )
-        rows = [
-            [
-                f"#{i + 1}",
-                ", ".join(names[j] for j in mm.true_atoms) or "(なし)",
-                _possible_values(premises, atoms, mm.true_atoms, loaded_s2),
-                _possible_values(premises, atoms, mm.true_atoms, GOAL),
-            ]
-            for i, mm in enumerate(models)
-        ]
-        r.table(
-            f"極小な abnormal の集合 — {label}",
-            ["", "abnormal (真の原子)", "loaded(S2)", "dead(S3)"],
-            rows,
-        )
-        refuting = [row for row in rows if "F" in row[3].split("/")]
-        r.expect(
-            f"{label[:3]} 極小な abnormal の集合の個数",
-            ok=len(models) == n_expected,
-            actual=f"{len(models)} 個",
-            expected=f"{n_expected} 個",
-            ref="p.654",
-        )
-        r.expect(
-            f"{label[:3]} サーカムスクリプションから dead(S3) が帰結するか",
-            ok=(not refuting) == (not effects_abnormal),
-            actual="帰結する (どの極小モデルでも dead(S3))"
-            if not refuting
-            else "帰結しない (¬dead(S3) の極小モデルがある)",
-            expected="帰結する" if not effects_abnormal else "帰結しない",
-            ref="p.654",
-            detail=(
-                "(16.28) は真の持続しか述べないので、dead が F→T に変わるのに abnormal は要らない。"
-                "abnormal が空のモデル (loaded が保たれ shoot で dead) が唯一の極小モデル"
-                if not effects_abnormal
-                else "ab(loaded, wait, S1) を含む方が Hanks–McDermott の直観に反するモデル: "
-                "wait が abnormal に弾を抜き (loaded(S2) = F)、"
-                "shoot の効果 ab(dead, shoot, S2) を避けている"
-            ),
-        )
+    r.text(CIRCUMSCRIPTION_NOTE)
 
-    # 3. 完全な仕様 ------------------------------------------------------------
+    _circumscription_case(
+        r,
+        label="(a) 本書どおり: (16.28) + (16.29)–(16.31)",
+        effects_abnormal=False,
+        expected_models=1,
+    )
+    _circumscription_case(
+        r,
+        label="(b) Hanks–McDermott: 効果公理が「その変化は abnormal」とも述べる",
+        effects_abnormal=True,
+        expected_models=2,
+    )
+
+
+def _circumscription_case(
+    r: Report, *, label: str, effects_abnormal: bool, expected_models: int
+) -> None:
+    """1 つの定式化について極小モデルを列挙し，dead(S3) が帰結するかを調べる
+
+    Args:
+        r: 出力先のレポート
+        label: 定式化の名前 (先頭 3 文字の (a) / (b) を検査名に使う)
+        effects_abnormal: 効果公理が「その変化は abnormal」とも述べるか
+        expected_models: 期待する極小な abnormal の集合の個数
+    """
+    tag = label[:3]
+
+    # 極小モデルを列挙する (表示順を固定するため abnormal の名前で整列)
+    premises, atoms, names = _circumscription_premises(effects_abnormal=effects_abnormal)
+    models = sorted(
+        minimal_models(premises, atoms), key=lambda mm: [names[j] for j in mm.true_atoms]
+    )
+
+    # 極小な abnormal の集合ごとに，loaded(S2) と dead(S3) が取りうる値を表にする
+    rows = [
+        [
+            f"#{i + 1}",
+            ", ".join(names[j] for j in mm.true_atoms) or "(なし)",
+            _possible_values(premises, atoms, mm.true_atoms, holds(loaded, S2)),
+            _possible_values(premises, atoms, mm.true_atoms, GOAL),
+        ]
+        for i, mm in enumerate(models)
+    ]
+    r.table(
+        f"極小な abnormal の集合 — {label}",
+        ["", "abnormal (真の原子)", "loaded(S2)", "dead(S3)"],
+        rows,
+    )
+
+    # 極小な集合の個数
+    r.expect(
+        f"{tag} 極小な abnormal の集合の個数",
+        ok=len(models) == expected_models,
+        actual=f"{len(models)} 個",
+        expected=f"{expected_models} 個",
+        ref="p.654",
+    )
+
+    # ¬dead(S3) になりうる極小モデルがなければ，サーカムスクリプションから dead(S3) が帰結する
+    entailed = not any("F" in row[3].split("/") for row in rows)
+    r.expect(
+        f"{tag} サーカムスクリプションから dead(S3) が帰結するか",
+        ok=entailed == (not effects_abnormal),
+        actual="帰結する (どの極小モデルでも dead(S3))"
+        if entailed
+        else "帰結しない (¬dead(S3) の極小モデルがある)",
+        expected="帰結しない" if effects_abnormal else "帰結する",
+        ref="p.654",
+        detail=HANKS_MCDERMOTT_NOTE if effects_abnormal else BOOK_FRAME_NOTE,
+    )
+
+
+def _check_complete_specification(r: Report) -> None:
+    """3. 効果の完全な仕様 (p.654) からは問いが帰結することを確かめる
+
+    Args:
+        r: 出力先のレポート
+    """
     r.section("3. 効果の完全な仕様からは帰結する", "p.654")
     r.axiom_list("効果の完全な仕様", "p.654", COMPLETE_SPECIFICATION)
-    complete = entails([ax.formula for ax in COMPLETE_SPECIFICATION] + [INITIAL.formula], GOAL)
+
+    premises = [ax.formula for ax in COMPLETE_SPECIFICATION] + [INITIAL.formula]
+    complete = entails(premises, GOAL)
     r.expect_entailment(
         "完全な仕様 + (16.31) ⊨ dead(do(shoot, do(wait, do(load, S0))))",
         complete,
@@ -390,8 +464,19 @@ def run() -> ExampleTrace:
         ref="p.654",
     )
 
-    # 4. Reiter の手続き → 基本行動理論 -------------------------------------------
+
+def _build_by_reiter(r: Report) -> BasicActionTheory:
+    """4. Reiter の手続きで効果公理から後継状態公理を作り，基本行動理論を組む
+
+    Args:
+        r: 出力先のレポート
+
+    Returns:
+        作った後継状態公理を使う基本行動理論
+    """
     r.section("4. Reiter の手続きで後継状態公理を作る", "§16.2.1 (16.50)")
+
+    # フルエントごとに γ⁺, γ⁻ と後継状態公理 (16.50) を作る
     derivations = [
         successor_state_axiom(
             LANG, sym, EFFECT_AXIOMS, params=(), action=a, situation=s, ref="(16.50)"
@@ -402,13 +487,17 @@ def run() -> ExampleTrace:
         r.formula(f"{d.fluent.name}: γ⁺", d.gamma_plus, "p.655")
         r.formula(f"{d.fluent.name}: γ⁻", d.gamma_minus, "p.655")
         r.formula(f"{d.fluent.name}: 後継状態公理", d.ssa.statement(), "(16.50)")
+
+        # 整合性の仮定 (p.656)
+        consistency = entails([], d.consistency)
         r.expect_entailment(
             f"{d.fluent.name}: 整合性の仮定 ¬(γ⁺ ∧ γ⁻)",
-            entails([], d.consistency),
+            consistency,
             Verdict.ENTAILED,
             ref="p.656",
         )
 
+    # 基本行動理論を組んで表示する
     bat = BasicActionTheory(
         name="Yale Shooting",
         language=LANG,
@@ -417,31 +506,50 @@ def run() -> ExampleTrace:
         d_s0=[INITIAL],
     )
     r.theory(bat)
+    return bat
+
+
+def _check_basic_action_theory(r: Report, bat: BasicActionTheory) -> None:
+    """5. 基本行動理論が完全な仕様と同値で，問いが帰結することを確かめる
+
+    Args:
+        r: 出力先のレポート
+        bat: Reiter の手続きで作った基本行動理論
+    """
+    r.section("5. 基本行動理論で確かめる", "§16.3, p.654")
+
+    # 定理 16.1
+    relative = bat.relative_satisfiability()
     r.expect_sat(
         "定理 16.1: D_una ∪ D_S0 は充足可能 (よって D も充足可能)",
-        bat.relative_satisfiability(),
+        relative,
         Satisfiability.SAT,
         ref="Theorem 16.1",
     )
+
+    # D から完全な仕様の 6 つの公理が従う
     for ax in COMPLETE_SPECIFICATION:
-        r.expect_entailment(
-            f"D ⊨ {ax.statement()}", bat.entails(ax.formula), Verdict.ENTAILED, ref="p.654"
-        )
-    spec_and_una = [ax.formula for ax in COMPLETE_SPECIFICATION] + [
-        ax.formula for ax in bat.d_una().axioms
-    ]
+        result = bat.entails(ax.formula)
+        r.expect_entailment(f"D ⊨ {ax.statement()}", result, Verdict.ENTAILED, ref="p.654")
+
+    # 逆に，完全な仕様と D_una から後継状態公理が従う
+    spec_and_una = [ax.formula for ax in COMPLETE_SPECIFICATION]
+    spec_and_una += [ax.formula for ax in bat.d_una().axioms]
     for ssa in bat.d_ss:
+        result = entails(spec_and_una, ssa.formula)
         r.expect_entailment(
             f"逆向き: 完全な仕様 ∪ D_una ⊨ {ssa.statement()}",
-            entails(spec_and_una, ssa.formula),
+            result,
             Verdict.ENTAILED,
             ref="p.654",
-            detail="行動は load, wait, shoot だけ (領域閉包) なので、行動ごとの仕様から SSA が従う",
+            detail=CLOSURE_NOTE,
         )
 
+    # 問いが D から帰結する
+    direct = bat.entails(GOAL)
     r.expect_entailment(
         "D ⊨ dead(do(shoot, do(wait, do(load, S0))))",
-        bat.entails(GOAL),
+        direct,
         Verdict.ENTAILED,
         ref="p.654",
     )
@@ -450,13 +558,13 @@ def run() -> ExampleTrace:
     reg = regress(bat, GOAL)
     for i, step in enumerate(reg.steps, start=1):
         r.formula(f"回帰 {i} 段目", step, "§16.3")
+    by_regression = entailed_by_initial_database(bat, reg.result)
     r.expect_entailment(
         f"D_una ∪ D_S0 ⊨ {show(reg.result)} (回帰の結果)",
-        entailed_by_initial_database(bat, reg.result),
+        by_regression,
         Verdict.ENTAILED,
         ref="p.664",
     )
-    return r.finish()
 
 
 def main() -> None:

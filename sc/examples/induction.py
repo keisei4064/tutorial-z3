@@ -91,6 +91,7 @@ def run() -> ExampleTrace:
         detail="真だが、証明には帰納法が要る。Z3 は帰納法を自動では使わないので判定できない",
     )
 
+    # 証明したい性質を帰納法の P に代入する
     def prop(sit: Situation) -> Formula:
         """性質 P(s) := loaded(s)
 
@@ -103,6 +104,7 @@ def run() -> ExampleTrace:
         return LANG.holds(loaded, sit)
 
     r.formula("(16.63) の P := loaded とした具体例", bat.induction_instance(prop), "(16.63)")
+    # 基底段階と帰納段階を示し，帰納法の具体例から全状況での性質を得る
     r.expect_entailment(
         "基底段階: D ⊨ loaded(S0)", bat.entails(prop(LANG.s0)), Verdict.ENTAILED, ref="(16.63)"
     )
@@ -134,6 +136,7 @@ def run() -> ExampleTrace:
         ],
     )
 
+    # 帰納段階で Executable の定義を使えるよう，P に S0 ⊑ s も含める
     def reachable_ok(sit: Situation) -> Formula:
         """P(s) := S0 ⊑ s ∧ (Executable(S0, s) ⊃ C(s))
 
@@ -196,6 +199,7 @@ def run() -> ExampleTrace:
             "Z3 が反例 (A を持ったまま C が A の上にある状態で putdown(A) など) を返した"
         ),
     )
+    # 保存の補題を使って帰納段階を示し，最後に求める性質を導く
     lemma = forall([ba, bs], z3.Implies(premise, bw.constraints(after)))
 
     r.expect_entailment(

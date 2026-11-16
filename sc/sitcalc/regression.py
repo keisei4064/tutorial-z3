@@ -108,14 +108,20 @@ def regress_once(theory: BasicActionTheory, phi: Formula) -> Formula:
         一段回帰した式
     """
     lang = theory.language
+    # Holds の置換式を組み立てる．Var(0), Var(1) はそれぞれ Holds の第 1, 第 2 引数
     p = Fluent(as_datatype_term(z3.Var(0, lang.fluent_sort)))
     s = Situation(as_datatype_term(z3.Var(1, lang.situation_sort)))
-    step = z3.If(
+
+    # Holds(p, s) の置換先: s = do(a, s') なら SSA の右辺 Φ(p, a, s')，それ以外はそのまま
+    #   do_action / do_situation は do の中からそれぞれ a / s' を取り出す
+    holds_replacement = z3.If(
         lang.is_do(s),
         theory.holds_cases(p, lang.do_action(s), lang.do_situation(s)),
         lang.holds(p, s),
     )
-    return as_formula(z3.simplify(z3.substitute_funs(phi, (lang.holds_decl, step))))
+
+    # φ 中の Holds に置換式を適用し，具体的な状況・フルエントに応じた場合分けを簡約する
+    return as_formula(z3.simplify(z3.substitute_funs(phi, (lang.holds_decl, holds_replacement))))
 
 
 @dataclass(frozen=True)
