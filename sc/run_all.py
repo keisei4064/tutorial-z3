@@ -1,11 +1,11 @@
-"""すべての例題を実行し、検査結果をまとめ、ビューア用の JSON を書き出す.
+"""すべての例題を実行し，検査結果をまとめ，ビューア用の JSON を書き出す
 
 使い方 (リポジトリのルートで)::
 
     uv run python -m sc.run_all            # sc/out/trace.json に書き出す
     uv run python -m sc.run_all out.json   # 書き出し先を指定
 
-どれかの例題で検査が期待と違えば終了コード 1 で終わる。
+どれかの例題で検査が期待と違えば終了コード 1 で終わる
 """
 
 import sys
@@ -39,13 +39,13 @@ DEFAULT_OUT = Path(__file__).resolve().parent / "out" / "trace.json"
 
 
 def _count_checks(trace: ExampleTrace) -> tuple[int, int]:
-    """例題の記録から、期待どおりの検査の数と全体の数を数える.
+    """例題の記録から，期待どおりの検査の数と全体の数を数える
 
     Args:
-        trace: 例題の記録。
+        trace: 例題の記録
 
     Returns:
-        (期待どおりの数, 全体の数)。
+        (期待どおりの数, 全体の数)
     """
     checks = [
         it["check"] for sec in trace["sections"] for it in sec["items"] if it["kind"] == "check"
@@ -54,13 +54,13 @@ def _count_checks(trace: ExampleTrace) -> tuple[int, int]:
 
 
 def main(argv: list[str]) -> int:
-    """すべての例題を実行する.
+    """すべての例題を実行する
 
     Args:
-        argv: コマンドライン引数 (argv[1] があれば書き出し先)。
+        argv: コマンドライン引数 (argv[1] があれば書き出し先)
 
     Returns:
-        終了コード (すべて期待どおりなら 0、そうでなければ 1)。
+        終了コード (すべて期待どおりなら 0，そうでなければ 1)
     """
     out = Path(argv[1]) if len(argv) > 1 else DEFAULT_OUT
     traces: list[ExampleTrace] = []

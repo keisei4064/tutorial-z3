@@ -1,18 +1,18 @@
-"""例 0: 回帰の定義の小さな例 (§16.3, p.664–665).
+"""例 0: 回帰の定義の小さな例 (§16.3, p.664–665)
 
 本書 p.665 の例: 後継状態公理
 
     F(do(a, s)) ≡ a = A ∨ F(s),
     G(do(a, s)) ≡ (a = B ∧ F(s)) ∨ G(s)
 
-のもとで、G(do(B, do(A, S0))) の回帰は
+のもとで，G(do(B, do(A, S0))) の回帰は
 
     (B = B ∧ (A = A ∨ F(S0))) ∨ (A = B ∧ F(S0)) ∨ G(S0)
 
-となり、これは true と同値。したがって D_S0 が空でも D ⊨ G(do(B, do(A, S0)))。
+となり，これは true と同値．したがって D_S0 が空でも D ⊨ G(do(B, do(A, S0)))
 """
 
-from z3 import And, Or
+import z3
 
 from sc.sitcalc.axioms import SuccessorStateAxiom
 from sc.sitcalc.language import Signature, SitCalcLanguage, eq
@@ -44,28 +44,38 @@ BAT = BasicActionTheory(
     d_ss=[
         # F(do(a, s)) ≡ a = A ∨ F(s)
         SuccessorStateAxiom(
-            language=LANG, fluent=LANG.fluents["F"], params=(), action=a, situation=s,
-            phi=Or(eq(a, A), holds(F, s)), ref="p.665",
+            language=LANG,
+            fluent=LANG.fluents["F"],
+            params=(),
+            action=a,
+            situation=s,
+            phi=z3.Or(eq(a, A), holds(F, s)),
+            ref="p.665",
         ),
         # G(do(a, s)) ≡ (a = B ∧ F(s)) ∨ G(s)
         SuccessorStateAxiom(
-            language=LANG, fluent=LANG.fluents["G"], params=(), action=a, situation=s,
-            phi=Or(And(eq(a, B), holds(F, s)), holds(G, s)), ref="p.665",
+            language=LANG,
+            fluent=LANG.fluents["G"],
+            params=(),
+            action=a,
+            situation=s,
+            phi=z3.Or(z3.And(eq(a, B), holds(F, s)), holds(G, s)),
+            ref="p.665",
         ),
     ],
     d_ap=[],  # この例では Poss を使わない
     d_s0=[],  # D_S0 は空 (S0 について何も知らない)
-)  # fmt: skip
+)
 
 
 def run() -> ExampleTrace:
-    """例題を実行する.
+    """例題を実行する
 
     Returns:
-        この例題の記録 (ビューア用。検査結果を含む)。
+        この例題の記録 (ビューア用．検査結果を含む)
 
     Raises:
-        CheckFailedError: 期待と違う検査があったとき (記録は例外の ``trace`` に入る)。
+        CheckFailedError: 期待と違う検査があったとき (記録は例外の ``trace`` に入る)
     """
     r = Report("regression_toy", "例 0: 回帰の小さな例", "§16.3 (p.664–665)")
     r.section("回帰 (regression)", "p.664–665")
@@ -122,7 +132,7 @@ def run() -> ExampleTrace:
 
 
 def main() -> None:
-    """コマンドラインから実行する."""
+    """コマンドラインから実行する"""
     run()
 
 

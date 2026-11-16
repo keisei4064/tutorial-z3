@@ -1,16 +1,16 @@
-"""例 3: ブロック世界の 2 つ目の版 — 行動 move だけ (§16.1, (16.25)–(16.27)).
+"""例 3: ブロック世界の 2 つ目の版 — 行動 move だけ (§16.1, (16.25)–(16.27))
 
-本書 p.650: 「エージェントがブロックを clear な位置から別の clear な位置へ動かせるなら、
-必要な行動は move(x, y) だけ (位置はブロックまたは机)」。フルエントも on(x, y) と
-clear(x) の 2 つで足りる。
+本書 p.650: 「エージェントがブロックを clear な位置から別の clear な位置へ動かせるなら
+必要な行動は move(x, y) だけ (位置はブロックまたは机)」．フルエントも on(x, y) と
+clear(x) の 2 つで足りる
 
 1. 基本行動理論 (16.25)–(16.27)
 2. プランニング: 例 2 と同じ Sussman の異常が 3 手で解ける (例 2 では 6 手)
-3. 注意: (16.25) には x ≠ y がないので、move(B, B) (ブロックを自分の上に置く) が
+3. 注意: (16.25) には x ≠ y がないので，move(B, B) (ブロックを自分の上に置く) が
    実行可能になってしまう
 """
 
-from z3 import And, Exists, Or
+import z3
 
 from sc.sitcalc.axioms import ActionPreconditionAxiom, SuccessorStateAxiom, closed_initial_database
 from sc.sitcalc.language import (
@@ -39,7 +39,7 @@ from sc.viz.tree import situation_tree
 
 
 class Position(DomainObject):
-    """位置: ブロックまたは机 (table)."""
+    """位置: ブロックまたは机 (table)"""
 
     __slots__ = ()
 
@@ -59,39 +59,39 @@ LANG = SitCalcLanguage(
 
 
 def move(x: Position, y: Position) -> Action:
-    """ブロック x を位置 y へ動かす行動の項.
+    """ブロック x を位置 y へ動かす行動の項
 
     Args:
-        x: 動かすブロック x。
-        y: 移動先 (ブロックまたは table)。
+        x: 動かすブロック x
+        y: 移動先 (ブロックまたは table)
 
     Returns:
-        行動の項。
+        行動の項
     """
     return LANG.actions["move"](x, y)
 
 
 def on(x: Position, y: Position) -> Fluent:
-    """「x が y の上にある」というフルエントの項.
+    """「x が y の上にある」というフルエントの項
 
     Args:
-        x: ブロック x。
-        y: 位置 y (ブロックまたは table)。
+        x: ブロック x
+        y: 位置 y (ブロックまたは table)
 
     Returns:
-        フルエントの項。
+        フルエントの項
     """
     return LANG.fluents["on"](x, y)
 
 
 def clear(x: Position) -> Fluent:
-    """「x の上に何もない」というフルエントの項.
+    """「x の上に何もない」というフルエントの項
 
     Args:
-        x: 位置 x (ブロックまたは table)。
+        x: 位置 x (ブロックまたは table)
 
     Returns:
-        フルエントの項。
+        フルエントの項
     """
     return LANG.fluents["clear"](x)
 
@@ -114,13 +114,13 @@ D_AP = (
         action_symbol=LANG.actions["move"],
         params=(x, y),
         situation=s,
-        pi=And(ne(x, TABLE), holds(clear(x), s), holds(clear(y), s)),
+        pi=z3.And(ne(x, TABLE), holds(clear(x), s), holds(clear(y), s)),
         ref="(16.25)",
     ),
 )
 
-# 本書の (16.26), (16.27) は「a = move(x, y) のとき」の形で書かれている。行動は move だけ
-# なので、∃x, y. a = move(x, y) ∧ … とすれば後継状態公理 (16.66) の形になる。
+# 本書の (16.26), (16.27) は「a = move(x, y) のとき」の形で書かれている．行動は move だけ
+# なので，∃x, y. a = move(x, y) ∧ … とすれば後継状態公理 (16.66) の形になる
 D_SS = (
     # (16.26) clear(u, do(move(x, y), s)) ≡ u = table ∨ on(x, u, s) ∨ (clear(u, s) ∧ u ≠ y)
     SuccessorStateAxiom(
@@ -129,11 +129,11 @@ D_SS = (
         params=(u,),
         action=a,
         situation=s,
-        phi=Exists(
+        phi=z3.Exists(
             [x.expr, y.expr],
-            And(
+            z3.And(
                 eq(a, move(x, y)),
-                Or(eq(u, TABLE), holds(on(x, u), s), And(holds(clear(u), s), ne(u, y))),
+                z3.Or(eq(u, TABLE), holds(on(x, u), s), z3.And(holds(clear(u), s), ne(u, y))),
             ),
         ),
         ref="(16.26)",
@@ -145,11 +145,11 @@ D_SS = (
         params=(u, v),
         action=a,
         situation=s,
-        phi=Exists(
+        phi=z3.Exists(
             [x.expr, y.expr],
-            And(
+            z3.And(
                 eq(a, move(x, y)),
-                Or(And(eq(x, u), eq(y, v)), And(holds(on(u, v), s), ne(u, x))),
+                z3.Or(z3.And(eq(x, u), eq(y, v)), z3.And(holds(on(u, v), s), ne(u, x))),
             ),
         ),
         ref="(16.27)",
@@ -173,25 +173,25 @@ BAT = BasicActionTheory(
 
 
 def sussman_goal(sit: Situation) -> Formula:
-    """ゴール on(A, B) ∧ on(B, C) を作る.
+    """ゴール on(A, B) ∧ on(B, C) を作る
 
     Args:
-        sit: 状況の項。
+        sit: 状況の項
 
     Returns:
-        論理式。
+        論理式
     """
-    return And(holds(on(A, B), sit), holds(on(B, C), sit))
+    return z3.And(holds(on(A, B), sit), holds(on(B, C), sit))
 
 
 def state_trace(state: frozenset[Fluent]) -> StateTrace:
-    """真なフルエントの集合から塔の形を作る (自分の上に載ったブロックは塔に含めない).
+    """真なフルエントの集合から塔の形を作る (自分の上に載ったブロックは塔に含めない)
 
     Args:
-        state: 真な基礎的なフルエントの集合。
+        state: 真な基礎的なフルエントの集合
 
     Returns:
-        ビューア用の状態 (この版にはロボットの手がないので holding は常に None)。
+        ビューア用の状態 (この版にはロボットの手がないので holding は常に None)
     """
     above: dict[str, str] = {}
     for b1 in BLOCKS:
@@ -209,13 +209,13 @@ def state_trace(state: frozenset[Fluent]) -> StateTrace:
 
 
 def run() -> ExampleTrace:
-    """例題を実行する.
+    """例題を実行する
 
     Returns:
-        この例題の記録 (ビューア用。検査結果を含む)。
+        この例題の記録 (ビューア用．検査結果を含む)
 
     Raises:
-        CheckFailedError: 期待と違う検査があったとき (記録は例外の ``trace`` に入る)。
+        CheckFailedError: 期待と違う検査があったとき (記録は例外の ``trace`` に入る)
     """
     r = Report("blocks_world_move", "例 3: ブロック世界 (move 版)", "§16.1 (16.25)–(16.27)")
 
@@ -258,7 +258,7 @@ def run() -> ExampleTrace:
         plan_situation = LANG.do_sequence(plan)
         r.expect_entailment(
             "検証 (公理版): D ⊨ Executable(S0, s_plan) ∧ on(A, B, s_plan) ∧ on(B, C, s_plan)",
-            BAT.entails(And(LANG.executable(S0, plan_situation), sussman_goal(plan_situation))),
+            BAT.entails(z3.And(LANG.executable(S0, plan_situation), sussman_goal(plan_situation))),
             Verdict.ENTAILED,
             ref="p.662",
         )
@@ -291,7 +291,7 @@ def run() -> ExampleTrace:
 
 
 def main() -> None:
-    """コマンドラインから実行する."""
+    """コマンドラインから実行する"""
     run()
 
 

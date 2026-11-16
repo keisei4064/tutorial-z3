@@ -1,12 +1,12 @@
-"""z3-solver (z3py) の部分スタブ.
+"""z3-solver (z3py) の部分スタブ
 
-z3-solver は型情報 (py.typed) を同梱しておらず、strict モードの pyright では
-ほぼすべての API が Unknown になる。そこで sc/ で実際に使う API だけを、
-実行時の実装 (z3/z3.py) に合わせて型付けしたスタブを用意する。
+z3-solver は型情報 (py.typed) を同梱しておらず，strict モードの pyright では
+ほぼすべての API が Unknown になる．そこで sc/ で実際に使う API だけを
+実行時の実装 (z3/z3.py) に合わせて型付けしたスタブを用意する
 
-- 引数名・既定値は実装に一致させる (mypy の stubtest で検証: README 参照)。
-- 実装が受け付ける型のうち、sc/ で使う型だけを宣言している (意図的に狭い)。
-- ``ctx`` 引数は sc/ では使わないので省略せず ``None`` 既定で残す。
+- 引数名・既定値は実装に一致させる (mypy の stubtest で検証: README 参照)
+- 実装が受け付ける型のうち，sc/ で使う型だけを宣言している (意図的に狭い)
+- ``ctx`` 引数は sc/ では使わないので省略せず ``None`` 既定で残す
 """
 
 from collections.abc import Sequence
@@ -21,7 +21,7 @@ class Context:
 class Z3PPObject: ...
 
 class AstRef(Z3PPObject):
-    # ast は C API のポインタ (ctypes)。sc/ からは直接生成しない
+    # ast は C API のポインタ (ctypes)．sc/ からは直接生成しない
     def __init__(self, ast: object, ctx: Context | None = None) -> None: ...
     def eq(self, other: AstRef) -> bool: ...
     def hash(self) -> int: ...

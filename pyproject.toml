@@ -16,3 +16,12 @@ dev = [
     "pyright>=1.1.414",
     "ruff>=0.17.5",
 ]
+
+[tool.pyright]
+# sc/ だけ strict にし、z3 の部分スタブ (sc/typings) を優先して読む。
+# ルートの他のファイル (ノートブックなど) には影響させない。
+strict = ["sc"]
+reportMissingModuleSource = "none"
+executionEnvironments = [
+  { root = "sc", extraPaths = ["sc/typings", "."] },
+]

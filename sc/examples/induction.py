@@ -1,20 +1,20 @@
-"""例 5: 帰納法と Z3 の限界 (§16.3, (16.63), p.664).
+"""例 5: 帰納法と Z3 の限界 (§16.3, (16.63), p.664)
 
-本書 p.664: 「基本行動理論で解ける問題の多くは一階の演繹で解けるが、∀s.C(s) の形の
-一般的な性質の証明 (例: あるゴールが達成不能であること) には帰納法が要る」。
+本書 p.664: 「基本行動理論で解ける問題の多くは一階の演繹で解けるが，∀s.C(s) の形の
+一般的な性質の証明 (例: あるゴールが達成不能であること) には帰納法が要る」
 
-Z3 は一階の自動証明器で、二階の帰納法公理 (16.63) を持たないし、帰納法を自動では使わない。
+Z3 は一階の自動証明器で，二階の帰納法公理 (16.63) を持たないし，帰納法を自動では使わない
 そこで特定の性質 P について (16.63) の一階の具体例
 
     [P(S0) ∧ ∀a, s. P(s) ⊃ P(do(a, s))] ⊃ ∀s. P(s)
 
-を作り、基底段階と帰納段階をそれぞれ Z3 で証明する。
+を作り，基底段階と帰納段階をそれぞれ Z3 で証明する
 
 1. p.664 の例: D_ss = {loaded(do(a, s)) ≡ loaded(s)}, D_S0 = {loaded(S0)} で ∀s.loaded(s)
-2. ブロック世界の状態制約 (p.657) が、S0 から実行可能なすべての状況で成り立つこと
+2. ブロック世界の状態制約 (p.657) が，S0 から実行可能なすべての状況で成り立つこと
 """
 
-from z3 import And, Implies
+import z3
 
 from sc.examples import blocks_world as bw
 from sc.sitcalc.axioms import InitialAxiom, Sentence, SuccessorStateAxiom, forall
@@ -30,7 +30,7 @@ from sc.viz.terminal import Report
 
 LANG = SitCalcLanguage(
     "induction",
-    # 本書は行動を特定していない。何でもよいので 2 つ置く
+    # 本書は行動を特定していない．何でもよいので 2 つ置く
     actions=[Signature("noop"), Signature("look")],
     fluents=[Signature("loaded")],
 )
@@ -40,12 +40,12 @@ s = LANG.situation_var("s")
 
 
 def _loaded_theory() -> BasicActionTheory:
-    """p.664 の基本行動理論を作る.
+    """p.664 の基本行動理論を作る
 
-    D_ap = ∅, D_ss = {loaded(do(a, s)) ≡ loaded(s)}, D_S0 = {loaded(S0)}。
+    D_ap = ∅, D_ss = {loaded(do(a, s)) ≡ loaded(s)}, D_S0 = {loaded(S0)}
 
     Returns:
-        基本行動理論。
+        基本行動理論
     """
     return BasicActionTheory(
         name="p.664 の例",
@@ -67,13 +67,13 @@ def _loaded_theory() -> BasicActionTheory:
 
 
 def run() -> ExampleTrace:
-    """例題を実行する.
+    """例題を実行する
 
     Returns:
-        この例題の記録 (ビューア用。検査結果を含む)。
+        この例題の記録 (ビューア用．検査結果を含む)
 
     Raises:
-        CheckFailedError: 期待と違う検査があったとき (記録は例外の ``trace`` に入る)。
+        CheckFailedError: 期待と違う検査があったとき (記録は例外の ``trace`` に入る)
     """
     r = Report("induction", "例 5: 帰納法と Z3 の限界", "§16.3 (16.63), p.664")
 
@@ -92,13 +92,13 @@ def run() -> ExampleTrace:
     )
 
     def prop(sit: Situation) -> Formula:
-        """性質 P(s) := loaded(s).
+        """性質 P(s) := loaded(s)
 
         Args:
-            sit: 状況の項。
+            sit: 状況の項
 
         Returns:
-            論理式。
+            論理式
         """
         return LANG.holds(loaded, sit)
 
@@ -108,7 +108,7 @@ def run() -> ExampleTrace:
     )
     r.expect_entailment(
         "帰納段階: D ⊨ ∀a, s. loaded(s) ⊃ loaded(do(a, s))",
-        bat.entails(forall([a, s], Implies(prop(s), prop(LANG.do(a, s))))),
+        bat.entails(forall([a, s], z3.Implies(prop(s), prop(LANG.do(a, s))))),
         Verdict.ENTAILED,
         ref="(16.63)",
     )
@@ -135,20 +135,20 @@ def run() -> ExampleTrace:
     )
 
     def reachable_ok(sit: Situation) -> Formula:
-        """P(s) := S0 ⊑ s ∧ (Executable(S0, s) ⊃ C(s)).
+        """P(s) := S0 ⊑ s ∧ (Executable(S0, s) ⊃ C(s))
 
         Args:
-            sit: 状況の項。
+            sit: 状況の項
 
         Returns:
-            論理式。
+            論理式
         """
-        return And(
+        return z3.And(
             bw.LANG.precedes_eq(s0, sit),
-            Implies(bw.LANG.executable(s0, sit), bw.constraints(sit)),
+            z3.Implies(bw.LANG.executable(s0, sit), bw.constraints(sit)),
         )
 
-    target = forall([bs], Implies(bw.LANG.executable(s0, bs), bw.constraints(bs)))
+    target = forall([bs], z3.Implies(bw.LANG.executable(s0, bs), bw.constraints(bs)))
     r.formula("示したい性質", target, "p.657")
     r.expect_entailment(
         "Z3 に直接聞く: D ⊨ ∀s. Executable(S0, s) ⊃ C(s)",
@@ -173,11 +173,11 @@ def run() -> ExampleTrace:
     )
     one_step = blocks.one_step_instances(ba, bs)
     after = bw.LANG.do(ba, bs)
-    premise = And(bw.constraints(bs), bw.LANG.poss(ba, bs))
+    premise = z3.And(bw.constraints(bs), bw.LANG.poss(ba, bs))
     rows: list[list[str]] = []
     all_ok = True
     for ref, text, phi in bw.state_constraints(after):
-        res = entails(one_step, Implies(premise, phi), expand_finite=True)
+        res = entails(one_step, z3.Implies(premise, phi), expand_finite=True)
         all_ok = all_ok and res.entailed
         rows.append([ref, text, res.verdict.value])
     r.table(
@@ -196,7 +196,7 @@ def run() -> ExampleTrace:
             "Z3 が反例 (A を持ったまま C が A の上にある状態で putdown(A) など) を返した"
         ),
     )
-    lemma = forall([ba, bs], Implies(premise, bw.constraints(after)))
+    lemma = forall([ba, bs], z3.Implies(premise, bw.constraints(after)))
 
     r.expect_entailment(
         "基底段階: D ⊨ P(S0)",
@@ -213,7 +213,7 @@ def run() -> ExampleTrace:
         "帰納段階: 補題 ∪ Σ ∪ Executable の定義 ⊨ ∀a, s. P(s) ⊃ P(do(a, s))",
         entails(
             step_premises,
-            forall([ba, bs], Implies(reachable_ok(bs), reachable_ok(bw.LANG.do(ba, bs)))),
+            forall([ba, bs], z3.Implies(reachable_ok(bs), reachable_ok(bw.LANG.do(ba, bs)))),
             expand_finite=True,
         ),
         Verdict.ENTAILED,
@@ -229,7 +229,7 @@ def run() -> ExampleTrace:
             [
                 blocks.induction_instance(reachable_ok),
                 reachable_ok(s0),
-                forall([ba, bs], Implies(reachable_ok(bs), reachable_ok(bw.LANG.do(ba, bs)))),
+                forall([ba, bs], z3.Implies(reachable_ok(bs), reachable_ok(bw.LANG.do(ba, bs)))),
             ],
             target,
         ),
@@ -240,7 +240,7 @@ def run() -> ExampleTrace:
 
 
 def main() -> None:
-    """コマンドラインから実行する."""
+    """コマンドラインから実行する"""
     run()
 
 

@@ -1,22 +1,22 @@
-"""例 2: ブロック世界 (§16.1 の 1 つ目の版, §16.2.1, §16.3, §16.4).
+"""例 2: ブロック世界 (§16.1 の 1 つ目の版, §16.2.1, §16.3, §16.4)
 
-片手のロボットが、同じ大きさのブロックを机の上で塔に積み替える (p.649–650)。
+片手のロボットが，同じ大きさのブロックを机の上で塔に積み替える (p.649–650)
 
-1. 言語 (p.650) と、効果の完全な仕様 (16.1)–(16.24)
+1. 言語 (p.650) と，効果の完全な仕様 (16.1)–(16.24)
 2. Reiter の手続き: 効果公理 (16.32)–(16.49) から後継状態公理 (16.50) を作る
    (p.656 の clear の後継状態公理と一致することも確かめる)
 3. 整合性の仮定 ¬(γ⁺ ∧ γ⁻) (p.656) は clear について無条件では成り立たない
-   (a = stack(u, u) が反例)。Poss と状態制約のもとでは成り立つ
+   (a = stack(u, u) が反例)．Poss と状態制約のもとでは成り立つ
 4. 作った後継状態公理と (16.5)–(16.24) の同値性 (どの式が Poss と状態制約を要するか)
-5. 基本行動理論と、p.665 の例 [stack(A, B), pickup(C), putdown(C)] の実行可能性・射影
-   (回帰による判定と、一階の帰結としての直接の判定)
+5. 基本行動理論と，p.665 の例 [stack(A, B), pickup(C), putdown(C)] の実行可能性・射影
+   (回帰による判定と，一階の帰結としての直接の判定)
 6. 本書 p.662 の Executable の定義はそのままだと矛盾すること
 7. プランニング (§16.4): Sussman の異常 (Sussman anomaly)
 """
 
 from collections.abc import Sequence
 
-from z3 import And, Exists, Implies, Not, Or
+import z3
 
 from sc.sitcalc.axioms import (
     ActionPreconditionAxiom,
@@ -58,7 +58,7 @@ from sc.viz.tree import situation_tree
 
 
 class Block(DomainObject):
-    """ソート block の項."""
+    """ソート block の項"""
 
     __slots__ = ()
 
@@ -77,7 +77,7 @@ LANG = SitCalcLanguage(
     fluents=[
         Signature("on", (BLOCK, BLOCK)),  # on(x, y): x が y の上にある
         Signature("ontable", (BLOCK,)),  # ontable(x): x が机の上にある
-        Signature("clear", (BLOCK,)),  # clear(x): x の上に何もなく、手にも持っていない
+        Signature("clear", (BLOCK,)),  # clear(x): x の上に何もなく，手にも持っていない
         Signature("holding", (BLOCK,)),  # holding(x): x を持っている
         Signature("handempty"),  # handempty: 手が空
     ],
@@ -85,109 +85,109 @@ LANG = SitCalcLanguage(
 
 
 def stack(x: Block, y: Block) -> Action:
-    """ブロック x を y の上に積む行動の項.
+    """ブロック x を y の上に積む行動の項
 
     Args:
-        x: ブロック x。
-        y: 積む先のブロック y。
+        x: ブロック x
+        y: 積む先のブロック y
 
     Returns:
-        行動の項。
+        行動の項
     """
     return LANG.actions["stack"](x, y)
 
 
 def unstack(x: Block, y: Block) -> Action:
-    """ブロック y の上の x を取る行動の項.
+    """ブロック y の上の x を取る行動の項
 
     Args:
-        x: ブロック x。
-        y: x が載っているブロック y。
+        x: ブロック x
+        y: x が載っているブロック y
 
     Returns:
-        行動の項。
+        行動の項
     """
     return LANG.actions["unstack"](x, y)
 
 
 def pickup(x: Block) -> Action:
-    """机の上の x を取る行動の項.
+    """机の上の x を取る行動の項
 
     Args:
-        x: ブロック x。
+        x: ブロック x
 
     Returns:
-        行動の項。
+        行動の項
     """
     return LANG.actions["pickup"](x)
 
 
 def putdown(x: Block) -> Action:
-    """持っている x を机に置く行動の項.
+    """持っている x を机に置く行動の項
 
     Args:
-        x: ブロック x。
+        x: ブロック x
 
     Returns:
-        行動の項。
+        行動の項
     """
     return LANG.actions["putdown"](x)
 
 
 def on(x: Block, y: Block) -> Fluent:
-    """「x が y の上にある」というフルエントの項.
+    """「x が y の上にある」というフルエントの項
 
     Args:
-        x: ブロック x。
-        y: ブロック y。
+        x: ブロック x
+        y: ブロック y
 
     Returns:
-        フルエントの項。
+        フルエントの項
     """
     return LANG.fluents["on"](x, y)
 
 
 def ontable(x: Block) -> Fluent:
-    """「x が机の上にある」というフルエントの項.
+    """「x が机の上にある」というフルエントの項
 
     Args:
-        x: ブロック x。
+        x: ブロック x
 
     Returns:
-        フルエントの項。
+        フルエントの項
     """
     return LANG.fluents["ontable"](x)
 
 
 def clear(x: Block) -> Fluent:
-    """「x の上に何もなく手にも持っていない」というフルエントの項.
+    """「x の上に何もなく手にも持っていない」というフルエントの項
 
     Args:
-        x: ブロック x。
+        x: ブロック x
 
     Returns:
-        フルエントの項。
+        フルエントの項
     """
     return LANG.fluents["clear"](x)
 
 
 def holding(x: Block) -> Fluent:
-    """「x を持っている」というフルエントの項.
+    """「x を持っている」というフルエントの項
 
     Args:
-        x: ブロック x。
+        x: ブロック x
 
     Returns:
-        フルエントの項。
+        フルエントの項
     """
     return LANG.fluents["holding"](x)
 
 
 def handempty() -> Fluent:
-    """「手が空」というフルエントの項.
+    """「手が空」というフルエントの項
 
     Returns:
-        フルエントの項。
+        フルエントの項
     """
     return LANG.fluents["handempty"]()
 
@@ -208,49 +208,65 @@ s = LANG.situation_var("s")
 D_AP: tuple[ActionPreconditionAxiom, ...] = (
     # (16.1) Poss(stack(x, y), s) ≡ holding(x, s) ∧ clear(y, s)
     ActionPreconditionAxiom(
-        language=LANG, action_symbol=LANG.actions["stack"], params=(x, y), situation=s,
-        pi=And(holds(holding(x), s), holds(clear(y), s)), ref="(16.1)",
+        language=LANG,
+        action_symbol=LANG.actions["stack"],
+        params=(x, y),
+        situation=s,
+        pi=z3.And(holds(holding(x), s), holds(clear(y), s)),
+        ref="(16.1)",
     ),
     # (16.2) Poss(unstack(x, y), s) ≡ on(x, y, s) ∧ clear(x, s) ∧ handempty(s)
     ActionPreconditionAxiom(
-        language=LANG, action_symbol=LANG.actions["unstack"], params=(x, y), situation=s,
-        pi=And(holds(on(x, y), s), holds(clear(x), s), holds(handempty(), s)), ref="(16.2)",
+        language=LANG,
+        action_symbol=LANG.actions["unstack"],
+        params=(x, y),
+        situation=s,
+        pi=z3.And(holds(on(x, y), s), holds(clear(x), s), holds(handempty(), s)),
+        ref="(16.2)",
     ),
     # (16.3) Poss(pickup(x), s) ≡ ontable(x, s) ∧ clear(x, s) ∧ handempty(s)
     ActionPreconditionAxiom(
-        language=LANG, action_symbol=LANG.actions["pickup"], params=(x,), situation=s,
-        pi=And(holds(ontable(x), s), holds(clear(x), s), holds(handempty(), s)), ref="(16.3)",
+        language=LANG,
+        action_symbol=LANG.actions["pickup"],
+        params=(x,),
+        situation=s,
+        pi=z3.And(holds(ontable(x), s), holds(clear(x), s), holds(handempty(), s)),
+        ref="(16.3)",
     ),
     # (16.4) Poss(putdown(x), s) ≡ holding(x, s)
     ActionPreconditionAxiom(
-        language=LANG, action_symbol=LANG.actions["putdown"], params=(x,), situation=s,
-        pi=holds(holding(x), s), ref="(16.4)",
+        language=LANG,
+        action_symbol=LANG.actions["putdown"],
+        params=(x,),
+        situation=s,
+        pi=holds(holding(x), s),
+        ref="(16.4)",
     ),
-)  # fmt: skip
+)
 
 # ---------------------------------------------------------------------------
-# 効果の完全な仕様 (16.5)–(16.24): 行動ごとに、各フルエントの値を完全に定める
+# 効果の完全な仕様 (16.5)–(16.24): 行動ごとに，各フルエントの値を完全に定める
 # ---------------------------------------------------------------------------
 
 
 class ActionSpec:
-    """(16.5)–(16.24) の 1 つ: ∀x⃗, s. φ(do(A(x⃗), s)) (自由変数は u, v と行動の引数).
+    """(16.5)–(16.24) の 1 つ: ∀x⃗, s. φ(do(A(x⃗), s)) (自由変数は u, v と行動の引数)
 
     Attributes:
-        ref: 本書の式番号。
-        action: 行動の項 A(x⃗) (Poss の前提に使う)。
-        variables: 自由変数 (s 以外)。
-        body: 式の本体 φ(do(A(x⃗), s)) (自由変数を含む)。
+        ref: 本書の式番号
+        action: 行動の項 A(x⃗) (Poss の前提に使う)
+        variables: 自由変数 (s 以外)
+        body: 式の本体 φ(do(A(x⃗), s)) (自由変数を含む)
     """
 
     def __init__(self, ref: str, action: Action, variables: Sequence[Block], body: Formula) -> None:
-        """式を登録する.
+        """式を登録する
 
         Args:
-            ref: 本書の式番号。
-            action: 行動の項 A(x⃗)。
-            variables: 自由変数 (s 以外)。
-            body: 式の本体。
+            ref: 本書の式番号
+            action: 行動の項 A(x⃗)
+            variables: 自由変数 (s 以外)
+            body: 式の本体
         """
         self.ref = ref
         self.action = action
@@ -259,23 +275,23 @@ class ActionSpec:
 
     @property
     def sentence(self) -> Sentence:
-        """全称閉包."""
+        """全称閉包"""
         return Sentence(
             ref=self.ref, sentence=forall([*self.variables, s], self.body), display=show(self.body)
         )
 
 
 def _spec(ref: str, action: Action, variables: Sequence[Block], body: Formula) -> ActionSpec:
-    """(16.5)–(16.24) の 1 つを作る (表を短く書くための略記).
+    """(16.5)–(16.24) の 1 つを作る (表を短く書くための略記)
 
     Args:
-        ref: 本書の式番号。
-        action: 行動の項。
-        variables: 自由変数 (s 以外)。
-        body: 式の本体。
+        ref: 本書の式番号
+        action: 行動の項
+        variables: 自由変数 (s 以外)
+        body: 式の本体
 
     Returns:
-        式。
+        式
     """
     return ActionSpec(ref, action, variables, body)
 
@@ -284,38 +300,74 @@ _st, _un, _pu, _pd = do(stack(x, y), s), do(unstack(x, y), s), do(pickup(x), s),
 
 ACTION_SPECS: tuple[ActionSpec, ...] = (
     # stack(x, y)
-    _spec("(16.5)", stack(x, y), (u, x, y),
-          holds(holding(u), _st) == And(holds(holding(u), s), ne(u, x))),
+    _spec(
+        "(16.5)",
+        stack(x, y),
+        (u, x, y),
+        holds(holding(u), _st) == z3.And(holds(holding(u), s), ne(u, x)),
+    ),
     _spec("(16.6)", stack(x, y), (x, y), holds(handempty(), _st)),
-    _spec("(16.7)", stack(x, y), (u, v, x, y),
-          holds(on(u, v), _st) == Or(And(eq(u, x), eq(v, y)), holds(on(u, v), s))),
-    _spec("(16.8)", stack(x, y), (u, x, y),
-          holds(clear(u), _st) == Or(eq(u, x), And(holds(clear(u), s), ne(u, y)))),
+    _spec(
+        "(16.7)",
+        stack(x, y),
+        (u, v, x, y),
+        holds(on(u, v), _st) == z3.Or(z3.And(eq(u, x), eq(v, y)), holds(on(u, v), s)),
+    ),
+    _spec(
+        "(16.8)",
+        stack(x, y),
+        (u, x, y),
+        holds(clear(u), _st) == z3.Or(eq(u, x), z3.And(holds(clear(u), s), ne(u, y))),
+    ),
     _spec("(16.9)", stack(x, y), (u, x, y), holds(ontable(u), _st) == holds(ontable(u), s)),
     # unstack(x, y)
     _spec("(16.10)", unstack(x, y), (u, x, y), holds(holding(u), _un) == eq(u, x)),
-    _spec("(16.11)", unstack(x, y), (x, y), Not(holds(handempty(), _un))),
-    _spec("(16.12)", unstack(x, y), (u, v, x, y),
-          holds(on(u, v), _un) == And(holds(on(u, v), s), Not(And(eq(x, u), eq(y, v))))),
-    _spec("(16.13)", unstack(x, y), (u, x, y),
-          holds(clear(u), _un) == Or(eq(u, y), And(holds(clear(u), s), ne(u, x)))),
+    _spec("(16.11)", unstack(x, y), (x, y), z3.Not(holds(handempty(), _un))),
+    _spec(
+        "(16.12)",
+        unstack(x, y),
+        (u, v, x, y),
+        holds(on(u, v), _un) == z3.And(holds(on(u, v), s), z3.Not(z3.And(eq(x, u), eq(y, v)))),
+    ),
+    _spec(
+        "(16.13)",
+        unstack(x, y),
+        (u, x, y),
+        holds(clear(u), _un) == z3.Or(eq(u, y), z3.And(holds(clear(u), s), ne(u, x))),
+    ),
     _spec("(16.14)", unstack(x, y), (u, x, y), holds(ontable(u), _un) == holds(ontable(u), s)),
     # pickup(x)
     _spec("(16.15)", pickup(x), (u, x), holds(holding(u), _pu) == eq(u, x)),
-    _spec("(16.16)", pickup(x), (x,), Not(holds(handempty(), _pu))),
+    _spec("(16.16)", pickup(x), (x,), z3.Not(holds(handempty(), _pu))),
     _spec("(16.17)", pickup(x), (u, v, x), holds(on(u, v), _pu) == holds(on(u, v), s)),
-    _spec("(16.18)", pickup(x), (u, x), holds(clear(u), _pu) == And(holds(clear(u), s), ne(u, x))),
-    _spec("(16.19)", pickup(x), (u, x),
-          holds(ontable(u), _pu) == And(holds(ontable(u), s), ne(x, u))),
+    _spec(
+        "(16.18)", pickup(x), (u, x), holds(clear(u), _pu) == z3.And(holds(clear(u), s), ne(u, x))
+    ),
+    _spec(
+        "(16.19)",
+        pickup(x),
+        (u, x),
+        holds(ontable(u), _pu) == z3.And(holds(ontable(u), s), ne(x, u)),
+    ),
     # putdown(x)
-    _spec("(16.20)", putdown(x), (u, x),
-          holds(holding(u), _pd) == And(holds(holding(u), s), ne(u, x))),
+    _spec(
+        "(16.20)",
+        putdown(x),
+        (u, x),
+        holds(holding(u), _pd) == z3.And(holds(holding(u), s), ne(u, x)),
+    ),
     _spec("(16.21)", putdown(x), (x,), holds(handempty(), _pd)),
     _spec("(16.22)", putdown(x), (u, v, x), holds(on(u, v), _pd) == holds(on(u, v), s)),
-    _spec("(16.23)", putdown(x), (u, x), holds(clear(u), _pd) == Or(eq(u, x), holds(clear(u), s))),
-    _spec("(16.24)", putdown(x), (u, x),
-          holds(ontable(u), _pd) == Or(eq(u, x), holds(ontable(u), s))),
-)  # fmt: skip
+    _spec(
+        "(16.23)", putdown(x), (u, x), holds(clear(u), _pd) == z3.Or(eq(u, x), holds(clear(u), s))
+    ),
+    _spec(
+        "(16.24)",
+        putdown(x),
+        (u, x),
+        holds(ontable(u), _pd) == z3.Or(eq(u, x), holds(ontable(u), s)),
+    ),
+)
 
 # ---------------------------------------------------------------------------
 # 効果公理 (16.32)–(16.49)
@@ -325,22 +377,27 @@ ACTION_SPECS: tuple[ActionSpec, ...] = (
 def _eff(
     ref: str, fluent: Fluent, action: Action, variables: Sequence[Block], *, positive: bool
 ) -> EffectAxiom:
-    """効果公理 (16.32)–(16.49) の 1 つを作る (表を短く書くための略記).
+    """効果公理 (16.32)–(16.49) の 1 つを作る (表を短く書くための略記)
 
     Args:
-        ref: 本書の式番号。
-        fluent: フルエントの項 F(t⃗)。
-        action: 行動の項 A(r⃗)。
-        variables: 自由変数 (s 以外)。
-        positive: F を真にするなら True、偽にするなら False。
+        ref: 本書の式番号
+        fluent: フルエントの項 F(t⃗)
+        action: 行動の項 A(r⃗)
+        variables: 自由変数 (s 以外)
+        positive: F を真にするなら True，偽にするなら False
 
     Returns:
-        効果公理 (条件なし)。
+        効果公理 (条件なし)
     """
     return EffectAxiom(
-        language=LANG, positive=positive, fluent=fluent, action=action, situation=s,
-        variables=tuple(variables), ref=ref,
-    )  # fmt: skip
+        language=LANG,
+        positive=positive,
+        fluent=fluent,
+        action=action,
+        situation=s,
+        variables=tuple(variables),
+        ref=ref,
+    )
 
 
 EFFECT_AXIOMS: tuple[EffectAxiom, ...] = (
@@ -366,14 +423,18 @@ EFFECT_AXIOMS: tuple[EffectAxiom, ...] = (
 
 
 def derive_successor_state_axioms() -> tuple[ReiterDerivation, ...]:
-    """効果公理 (16.32)–(16.49) から各フルエントの後継状態公理 (16.50) を作る.
+    """効果公理 (16.32)–(16.49) から各フルエントの後継状態公理 (16.50) を作る
 
     Returns:
-        フルエント記号ごとの導出結果 (言語の宣言順)。
+        フルエント記号ごとの導出結果 (言語の宣言順)
     """
     params: dict[str, tuple[Block, ...]] = {
-        "on": (u, v), "ontable": (u,), "clear": (u,), "holding": (u,), "handempty": (),
-    }  # fmt: skip
+        "on": (u, v),
+        "ontable": (u,),
+        "clear": (u,),
+        "holding": (u,),
+        "handempty": (),
+    }
     return tuple(
         successor_state_axiom(
             LANG, sym, EFFECT_AXIOMS, params=params[name], action=a, situation=s, ref="(16.50)"
@@ -383,24 +444,24 @@ def derive_successor_state_axioms() -> tuple[ReiterDerivation, ...]:
 
 
 def book_clear_ssa() -> Formula:
-    """p.656 の clear の後継状態公理 (本書の "putdon" は putdown の誤植).
+    """p.656 の clear の後継状態公理 (本書の "putdon" は putdown の誤植)
 
     Returns:
-        全称閉包した文。
+        全称閉包した文
     """
     return forall(
         [x, a, s],
         holds(clear(x), do(a, s))
-        == Or(
-            Exists([y.expr], eq(a, stack(x, y))),
-            Exists([y.expr], eq(a, unstack(y, x))),
+        == z3.Or(
+            z3.Exists([y.expr], eq(a, stack(x, y))),
+            z3.Exists([y.expr], eq(a, unstack(y, x))),
             eq(a, putdown(x)),
-            And(
+            z3.And(
                 holds(clear(x), s),
-                Not(
-                    Or(
-                        Exists([y.expr], eq(a, stack(y, x))),
-                        Exists([y.expr], eq(a, unstack(x, y))),
+                z3.Not(
+                    z3.Or(
+                        z3.Exists([y.expr], eq(a, stack(y, x))),
+                        z3.Exists([y.expr], eq(a, unstack(x, y))),
                         eq(a, pickup(x)),
                     )
                 ),
@@ -415,7 +476,7 @@ def book_clear_ssa() -> Formula:
 
 
 def state_constraints(sit: Situation) -> tuple[tuple[str, str, Formula], ...]:
-    """ブロック世界の状態制約 (出典, 表示, 式).
+    """ブロック世界の状態制約 (出典, 表示, 式)
 
     - p.657 の 4 つ: ブロックはちょうど 1 か所 (手の中・机の上・他のブロックの上) にある
     - p.650 のフルエントの説明から: clear と handempty の意味
@@ -424,47 +485,103 @@ def state_constraints(sit: Situation) -> tuple[tuple[str, str, Formula], ...]:
     - p.649 の「塔」から: ブロックの上・下にあるブロックは高々 1 つ
 
     Args:
-        sit: 状況の項。
+        sit: 状況の項
 
     Returns:
-        (出典, 表示用の文字列, 論理式) の組のタプル。
+        (出典, 表示用の文字列, 論理式) の組のタプル
     """
-    on_some = Exists([y.expr], holds(on(x, y), sit))
+    on_some = z3.Exists([y.expr], holds(on(x, y), sit))
     return (
-        ("p.657", "holding(x, s) ∨ ontable(x, s) ∨ ∃y.on(x, y, s)",
-         forall([x], Or(holds(holding(x), sit), holds(ontable(x), sit), on_some))),
-        ("p.657", "holding(x, s) ⊃ ¬(ontable(x, s) ∨ ∃y.on(x, y, s))",
-         forall([x], Implies(holds(holding(x), sit), Not(Or(holds(ontable(x), sit), on_some))))),
-        ("p.657", "ontable(x, s) ⊃ ¬(holding(x, s) ∨ ∃y.on(x, y, s))",
-         forall([x], Implies(holds(ontable(x), sit), Not(Or(holds(holding(x), sit), on_some))))),
-        ("p.657", "(∃y.on(x, y, s)) ⊃ ¬(holding(x, s) ∨ ontable(x, s))",
-         forall([x], Implies(on_some, Not(Or(holds(holding(x), sit), holds(ontable(x), sit)))))),
-        ("p.650 (clear の説明)", "clear(x, s) ≡ ¬holding(x, s) ∧ ¬∃y.on(y, x, s)",
-         forall([x], holds(clear(x), sit)
-                == And(Not(holds(holding(x), sit)), Not(Exists([y.expr], holds(on(y, x), sit)))))),
-        ("p.650 (handempty の説明)", "handempty(s) ≡ ¬∃x.holding(x, s)",
-         holds(handempty(), sit) == Not(Exists([x.expr], holds(holding(x), sit)))),
-        ("p.649 (片手のロボット)", "holding(x, s) ∧ holding(y, s) ⊃ x = y",
-         forall([x, y], Implies(And(holds(holding(x), sit), holds(holding(y), sit)), eq(x, y)))),
-        ("p.650 (持ち上げるのは clear なブロック)", "holding(x, s) ⊃ ¬∃y.on(y, x, s)",
-         forall([x], Implies(holds(holding(x), sit), Not(Exists([y.expr], holds(on(y, x), sit)))))),
-        ("p.649 (塔)", "on(x, y, s) ∧ on(x, z, s) ⊃ y = z",
-         forall([x, y, w], Implies(And(holds(on(x, y), sit), holds(on(x, w), sit)), eq(y, w)))),
-        ("p.649 (塔)", "on(y, x, s) ∧ on(z, x, s) ⊃ y = z",
-         forall([x, y, w], Implies(And(holds(on(y, x), sit), holds(on(w, x), sit)), eq(y, w)))),
-    )  # fmt: skip
+        (
+            "p.657",
+            "holding(x, s) ∨ ontable(x, s) ∨ ∃y.on(x, y, s)",
+            forall([x], z3.Or(holds(holding(x), sit), holds(ontable(x), sit), on_some)),
+        ),
+        (
+            "p.657",
+            "holding(x, s) ⊃ ¬(ontable(x, s) ∨ ∃y.on(x, y, s))",
+            forall(
+                [x],
+                z3.Implies(holds(holding(x), sit), z3.Not(z3.Or(holds(ontable(x), sit), on_some))),
+            ),
+        ),
+        (
+            "p.657",
+            "ontable(x, s) ⊃ ¬(holding(x, s) ∨ ∃y.on(x, y, s))",
+            forall(
+                [x],
+                z3.Implies(holds(ontable(x), sit), z3.Not(z3.Or(holds(holding(x), sit), on_some))),
+            ),
+        ),
+        (
+            "p.657",
+            "(∃y.on(x, y, s)) ⊃ ¬(holding(x, s) ∨ ontable(x, s))",
+            forall(
+                [x],
+                z3.Implies(on_some, z3.Not(z3.Or(holds(holding(x), sit), holds(ontable(x), sit)))),
+            ),
+        ),
+        (
+            "p.650 (clear の説明)",
+            "clear(x, s) ≡ ¬holding(x, s) ∧ ¬∃y.on(y, x, s)",
+            forall(
+                [x],
+                holds(clear(x), sit)
+                == z3.And(
+                    z3.Not(holds(holding(x), sit)),
+                    z3.Not(z3.Exists([y.expr], holds(on(y, x), sit))),
+                ),
+            ),
+        ),
+        (
+            "p.650 (handempty の説明)",
+            "handempty(s) ≡ ¬∃x.holding(x, s)",
+            holds(handempty(), sit) == z3.Not(z3.Exists([x.expr], holds(holding(x), sit))),
+        ),
+        (
+            "p.649 (片手のロボット)",
+            "holding(x, s) ∧ holding(y, s) ⊃ x = y",
+            forall(
+                [x, y], z3.Implies(z3.And(holds(holding(x), sit), holds(holding(y), sit)), eq(x, y))
+            ),
+        ),
+        (
+            "p.650 (持ち上げるのは clear なブロック)",
+            "holding(x, s) ⊃ ¬∃y.on(y, x, s)",
+            forall(
+                [x],
+                z3.Implies(
+                    holds(holding(x), sit), z3.Not(z3.Exists([y.expr], holds(on(y, x), sit)))
+                ),
+            ),
+        ),
+        (
+            "p.649 (塔)",
+            "on(x, y, s) ∧ on(x, z, s) ⊃ y = z",
+            forall(
+                [x, y, w], z3.Implies(z3.And(holds(on(x, y), sit), holds(on(x, w), sit)), eq(y, w))
+            ),
+        ),
+        (
+            "p.649 (塔)",
+            "on(y, x, s) ∧ on(z, x, s) ⊃ y = z",
+            forall(
+                [x, y, w], z3.Implies(z3.And(holds(on(y, x), sit), holds(on(w, x), sit)), eq(y, w))
+            ),
+        ),
+    )
 
 
 def constraints(sit: Situation) -> Formula:
-    """状態制約の連言 C(s) を作る.
+    """状態制約の連言 C(s) を作る
 
     Args:
-        sit: 状況の項。
+        sit: 状況の項
 
     Returns:
-        論理式。
+        論理式
     """
-    return And(*(phi for _, _, phi in state_constraints(sit)))
+    return z3.And(*(phi for _, _, phi in state_constraints(sit)))
 
 
 # ---------------------------------------------------------------------------
@@ -475,14 +592,14 @@ def constraints(sit: Situation) -> Formula:
 def basic_action_theory(
     name: str, initial: Sequence[InitialFluentDefinition] = ()
 ) -> BasicActionTheory:
-    """Reiter の手続きで作った後継状態公理を使う基本行動理論.
+    """Reiter の手続きで作った後継状態公理を使う基本行動理論
 
     Args:
-        name: 理論の名前 (表示用)。
-        initial: D_S0 (省略すると空)。
+        name: 理論の名前 (表示用)
+        initial: D_S0 (省略すると空)
 
     Returns:
-        基本行動理論。
+        基本行動理論
     """
     return BasicActionTheory(
         name=name,
@@ -493,7 +610,7 @@ def basic_action_theory(
     )
 
 
-# p.665 の例のための初期状況 (本書には D_S0 の記述がないので、例が実行可能になるよう選んだ)
+# p.665 の例のための初期状況 (本書には D_S0 の記述がないので，例が実行可能になるよう選んだ)
 PROJECTION_INITIAL = closed_initial_database(
     LANG,
     [holding(A), ontable(B), clear(B), ontable(C), clear(C)],
@@ -501,7 +618,7 @@ PROJECTION_INITIAL = closed_initial_database(
     note="本書の p.665 の例には D_S0 がないので、A を持ち B, C が机の上にある状況とした (閉世界)",
 )
 
-# Sussman の異常: C が A の上、B は机の上。ゴールは on(A, B) ∧ on(B, C)
+# Sussman の異常: C が A の上，B は机の上．ゴールは on(A, B) ∧ on(B, C)
 SUSSMAN_INITIAL = closed_initial_database(
     LANG,
     [on(C, A), ontable(A), ontable(B), clear(C), clear(B), handempty()],
@@ -511,15 +628,15 @@ SUSSMAN_INITIAL = closed_initial_database(
 
 
 def sussman_goal(sit: Situation) -> Formula:
-    """ゴール on(A, B) ∧ on(B, C) を作る.
+    """ゴール on(A, B) ∧ on(B, C) を作る
 
     Args:
-        sit: 状況の項。
+        sit: 状況の項
 
     Returns:
-        論理式。
+        論理式
     """
-    return And(holds(on(A, B), sit), holds(on(B, C), sit))
+    return z3.And(holds(on(A, B), sit), holds(on(B, C), sit))
 
 
 # ---------------------------------------------------------------------------
@@ -528,13 +645,13 @@ def sussman_goal(sit: Situation) -> Formula:
 
 
 def state_trace(state: frozenset[Fluent]) -> StateTrace:
-    """真なフルエントの集合から、塔の形を作る.
+    """真なフルエントの集合から，塔の形を作る
 
     Args:
-        state: 真な基礎的なフルエントの集合。
+        state: 真な基礎的なフルエントの集合
 
     Returns:
-        ビューア用の状態 (下から上への塔、持っているブロック、真なフルエント)。
+        ビューア用の状態 (下から上への塔，持っているブロック，真なフルエント)
     """
     blocks = BLOCK.constants()
     above: dict[str, str] = {}
@@ -563,13 +680,13 @@ def state_trace(state: frozenset[Fluent]) -> StateTrace:
 
 
 def run() -> ExampleTrace:  # noqa: C901, PLR0915
-    """例題を実行する.
+    """例題を実行する
 
     Returns:
-        この例題の記録 (ビューア用。検査結果を含む)。
+        この例題の記録 (ビューア用．検査結果を含む)
 
     Raises:
-        CheckFailedError: 期待と違う検査があったとき (記録は例外の ``trace`` に入る)。
+        CheckFailedError: 期待と違う検査があったとき (記録は例外の ``trace`` に入る)
     """
     r = Report("blocks_world", "例 2: ブロック世界", "§16.1, §16.2.1, §16.3, §16.4")
 
@@ -630,7 +747,9 @@ def run() -> ExampleTrace:  # noqa: C901, PLR0915
             params = d.ssa.params
             conditional = forall(
                 [*params, a, s],
-                Implies(And(poss(a, s), constraints(s)), Not(And(d.gamma_plus, d.gamma_minus))),
+                z3.Implies(
+                    z3.And(poss(a, s), constraints(s)), z3.Not(z3.And(d.gamma_plus, d.gamma_minus))
+                ),
             )
             r.expect_entailment(
                 "clear: Poss(a, s) と状態制約のもとでは ¬(γ⁺ ∧ γ⁻)",
@@ -659,7 +778,7 @@ def run() -> ExampleTrace:  # noqa: C901, PLR0915
         if not plain.entailed:
             conditional = forall(
                 [*spec.variables, s],
-                Implies(And(poss(spec.action, s), constraints(s)), spec.body),
+                z3.Implies(z3.And(poss(spec.action, s), constraints(s)), spec.body),
             )
             res = generic.entails(conditional)
             cond_result = res.verdict.value
@@ -681,7 +800,7 @@ def run() -> ExampleTrace:  # noqa: C901, PLR0915
     )
     r.expect_entailment(
         "D ∪ {holding(A, S0), holding(B, S0), …} ⊨ ¬(16.10) の例 (u = B, x = A, y = C, s = S0)",
-        odd.entails(Not(holds(holding(B), do(unstack(A, C), S0)) == eq(B, A))),
+        odd.entails(z3.Not(holds(holding(B), do(unstack(A, C), S0)) == eq(B, A))),
         Verdict.ENTAILED,
         ref="(16.10)",
         detail=(
@@ -690,7 +809,7 @@ def run() -> ExampleTrace:  # noqa: C901, PLR0915
     )
     r.expect_entailment(
         "D ∪ {holding(A, S0), holding(B, S0), …} ⊨ ¬(16.15) の例 (u = B, x = C, s = S0)",
-        odd.entails(Not(holds(holding(B), do(pickup(C), S0)) == eq(B, C))),
+        odd.entails(z3.Not(holds(holding(B), do(pickup(C), S0)) == eq(B, C))),
         Verdict.ENTAILED,
         ref="(16.15)",
     )
@@ -736,15 +855,19 @@ def run() -> ExampleTrace:  # noqa: C901, PLR0915
         )
     r.expect_entailment(
         "直接: D ⊨ Poss(stack(A, B), S0) ∧ Poss(pickup(C), …) ∧ Poss(putdown(C), …)",
-        bat.entails(And(*conds)),
+        bat.entails(z3.And(*conds)),
         Verdict.ENTAILED,
         ref="p.665",
     )
     final = LANG.do_sequence(sequence)
-    projection = And(
-        holds(on(A, B), final), holds(ontable(C), final), holds(clear(C), final),
-        holds(clear(A), final), Not(holds(clear(B), final)), holds(handempty(), final),
-    )  # fmt: skip
+    projection = z3.And(
+        holds(on(A, B), final),
+        holds(ontable(C), final),
+        holds(clear(C), final),
+        holds(clear(A), final),
+        z3.Not(holds(clear(B), final)),
+        holds(handempty(), final),
+    )
     r.formula("射影 (temporal projection) の問い", projection, "p.664")
     reg = regress(bat, projection)
     r.formula("回帰の結果", reg.result, "p.664")
@@ -759,7 +882,7 @@ def run() -> ExampleTrace:  # noqa: C901, PLR0915
     )
 
     bad = [pickup(C), pickup(B)]
-    bad_conds = And(*executability_conditions(bat, bad))
+    bad_conds = z3.And(*executability_conditions(bat, bad))
     r.expect_entailment(
         "実行できない例: D ⊨ [pickup(C), pickup(B)] が実行可能 ?",
         entailed_by_initial_database(bat, regress(bat, bad_conds).result),
@@ -768,7 +891,7 @@ def run() -> ExampleTrace:  # noqa: C901, PLR0915
     )
     r.expect_entailment(
         "実行できない例: D ⊨ ¬([pickup(C), pickup(B)] が実行可能)",
-        entailed_by_initial_database(bat, regress(bat, Not(bad_conds)).result),
+        entailed_by_initial_database(bat, regress(bat, z3.Not(bad_conds)).result),
         Verdict.ENTAILED,
         ref="p.665",
         detail="A を持っているので handempty(S0) が偽",
@@ -785,7 +908,7 @@ def run() -> ExampleTrace:  # noqa: C901, PLR0915
     hint = [
         LANG.executable(witness, witness),
         LANG.executable(witness, do(putdown(B), S0))
-        == And(poss(putdown(B), S0), LANG.executable(witness, S0)),
+        == z3.And(poss(putdown(B), S0), LANG.executable(witness, S0)),
     ]
     r.expect_sat(
         "D (Executable 以外) ∪ 本書の定義 は充足可能か",
@@ -836,7 +959,7 @@ def run() -> ExampleTrace:  # noqa: C901, PLR0915
         r.expect_entailment(
             "検証 (公理版): D ⊨ Executable(S0, s_plan) ∧ on(A, B, s_plan) ∧ on(B, C, s_plan)",
             planning_bat.entails(
-                And(LANG.executable(S0, plan_situation), sussman_goal(plan_situation))
+                z3.And(LANG.executable(S0, plan_situation), sussman_goal(plan_situation))
             ),
             Verdict.ENTAILED,
             ref="p.662",
@@ -854,7 +977,7 @@ def run() -> ExampleTrace:  # noqa: C901, PLR0915
 
 
 def main() -> None:
-    """コマンドラインから実行する."""
+    """コマンドラインから実行する"""
     run()
 
 

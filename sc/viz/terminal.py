@@ -1,12 +1,12 @@
-"""ターミナル表示 (rich) と、ビューア用データの記録.
+"""ターミナル表示 (rich) と，ビューア用データの記録
 
-各例題は :class:`Report` に節・説明・式・検査結果を書き込む。Report は
+各例題は :class:`Report` に節・説明・式・検査結果を書き込む．Report は
 
-- rich でターミナルに表示し、
-- 同じ内容を :mod:`sc.viz.export` の形式で記録する (``run_all`` が JSON に書き出す)。
+- rich でターミナルに表示し
+- 同じ内容を :mod:`sc.viz.export` の形式で記録する (``run_all`` が JSON に書き出す)
 
-検査 (:meth:`Report.expect` 系) は、期待と違えば記録した上で失敗として数え、
-:meth:`Report.finish` で例外を投げる。実行がそのままテストになる。
+検査 (:meth:`Report.expect` 系) は，期待と違えば記録した上で失敗として数え
+:meth:`Report.finish` で例外を投げる．実行がそのままテストになる
 """
 
 from collections.abc import Sequence
@@ -37,31 +37,31 @@ console = Console(highlight=False)
 
 
 class CheckFailedError(AssertionError):
-    """期待どおりでない検査があった (記録した結果も持つ).
+    """期待どおりでない検査があった (記録した結果も持つ)
 
     Attributes:
-        trace: 失敗した例題の記録 (run_all が JSON に書き出すのに使う)。
+        trace: 失敗した例題の記録 (run_all が JSON に書き出すのに使う)
     """
 
     def __init__(self, message: str, trace: ExampleTrace) -> None:
-        """失敗した検査の名前と、その例題の記録.
+        """失敗した検査の名前と，その例題の記録
 
         Args:
-            message: 期待と違った検査の名前 (カンマ区切り)。
-            trace: その例題の記録。
+            message: 期待と違った検査の名前 (カンマ区切り)
+            trace: その例題の記録
         """
         super().__init__(message)
         self.trace = trace
 
 
 def group_trace(group: AxiomGroup) -> AxiomGroupTrace:
-    """AxiomGroup を JSON 用の形に変換する.
+    """AxiomGroup を JSON 用の形に変換する
 
     Args:
-        group: 基本行動理論の構成要素。
+        group: 基本行動理論の構成要素
 
     Returns:
-        JSON 用の辞書 (二階の公理も表示用に含める)。
+        JSON 用の辞書 (二階の公理も表示用に含める)
     """
     axioms = [AxiomTrace(ref=a.ref, text=a.statement(), note=a.note) for a in group.axioms]
     axioms += [AxiomTrace(ref=a.ref, text=a.text, note=a.note) for a in group.second_order]
@@ -75,20 +75,20 @@ def group_trace(group: AxiomGroup) -> AxiomGroupTrace:
 
 
 class Report:
-    """1 つの例題の出力 (ターミナル表示と記録).
+    """1 つの例題の出力 (ターミナル表示と記録)
 
     Attributes:
-        trace: 記録 (ビューア用の JSON の形)。
-        failures: 期待と違った検査の名前。
+        trace: 記録 (ビューア用の JSON の形)
+        failures: 期待と違った検査の名前
     """
 
     def __init__(self, example_id: str, title: str, ref: str) -> None:
-        """例題の見出しを表示する.
+        """例題の見出しを表示する
 
         Args:
-            example_id: 例題の識別子 (モジュール名)。
-            title: 例題の題名。
-            ref: 本書での出典。
+            example_id: 例題の識別子 (モジュール名)
+            title: 例題の題名
+            ref: 本書での出典
         """
         self.trace: ExampleTrace = {"id": example_id, "title": title, "ref": ref, "sections": []}
         self.failures: list[str] = []
@@ -98,11 +98,11 @@ class Report:
     # -- 構造 ---------------------------------------------------------------
 
     def section(self, title: str, ref: str = "") -> None:
-        """節を始める (以降の内容はこの節に記録する).
+        """節を始める (以降の内容はこの節に記録する)
 
         Args:
-            title: 節の見出し。
-            ref: 本書での出典。
+            title: 節の見出し
+            ref: 本書での出典
         """
         self.trace["sections"].append({"title": title, "ref": ref, "items": []})
         label = f"{escape(title)}  [dim]{escape(ref)}[/dim]" if ref else escape(title)
@@ -110,10 +110,10 @@ class Report:
         console.print(Rule(label, align="left", style="cyan"))
 
     def _add(self, item: ItemTrace) -> None:
-        """現在の節に内容を記録する (節がなければ無題の節を作る).
+        """現在の節に内容を記録する (節がなければ無題の節を作る)
 
         Args:
-            item: 記録する内容。
+            item: 記録する内容
         """
         if not self.trace["sections"]:
             self.section("")
@@ -123,21 +123,21 @@ class Report:
     # -- 内容 ---------------------------------------------------------------
 
     def text(self, text: str) -> None:
-        """説明文を表示・記録する.
+        """説明文を表示・記録する
 
         Args:
-            text: 本文。
+            text: 本文
         """
         self._add({"kind": "text", "text": text})
         console.print(escape(text))
 
     def formula(self, label: str, phi: Formula | str, ref: str = "") -> None:
-        """式を表示・記録する.
+        """式を表示・記録する
 
         Args:
-            label: 見出し。
-            phi: 論理式 (本書の記法で表示する) または表示用の文字列。
-            ref: 本書での出典。
+            label: 見出し
+            phi: 論理式 (本書の記法で表示する) または表示用の文字列
+            ref: 本書での出典
         """
         text = phi if isinstance(phi, str) else show(phi)
         self._add({"kind": "formula", "label": label, "ref": ref, "text": text})
@@ -145,11 +145,11 @@ class Report:
         console.print(f"{head}\n    {escape(text)}")
 
     def axioms(self, name: str, groups: Sequence[AxiomGroup]) -> None:
-        """公理の集まりを、構成要素ごとに表示・記録する.
+        """公理の集まりを，構成要素ごとに表示・記録する
 
         Args:
-            name: 理論の名前。
-            groups: 構成要素。
+            name: 理論の名前
+            groups: 構成要素
         """
         self._add({"kind": "theory", "name": name, "groups": [group_trace(g) for g in groups]})
         console.print(f"[bold]{escape(name)}[/bold]")
@@ -177,33 +177,33 @@ class Report:
                 console.print(f"  [dim]※ {escape(g.note)}[/dim]")
 
     def theory(self, bat: BasicActionTheory) -> None:
-        """基本行動理論 D = Σ ∪ D_ss ∪ D_ap ∪ D_una ∪ D_S0 を表示・記録する.
+        """基本行動理論 D = Σ ∪ D_ss ∪ D_ap ∪ D_una ∪ D_S0 を表示・記録する
 
         Args:
-            bat: 基本行動理論。
+            bat: 基本行動理論
         """
         self.axioms(f"基本行動理論 D ({bat.name}) = Σ ∪ D_ss ∪ D_ap ∪ D_una ∪ D_S0", bat.groups())
 
     def axiom_list(self, name: str, ref: str, axioms: Sequence[Axiom], note: str = "") -> None:
-        """公理の列を 1 グループとして表示・記録する.
+        """公理の列を 1 グループとして表示・記録する
 
         Args:
-            name: 見出し。
-            ref: 本書での出典。
-            axioms: 公理。
-            note: 補足説明。
+            name: 見出し
+            ref: 本書での出典
+            axioms: 公理
+            note: 補足説明
         """
         self.axioms(
             name, [AxiomGroup(symbol=name, title="", ref=ref, axioms=tuple(axioms), note=note)]
         )
 
     def table(self, title: str, columns: Sequence[str], rows: Sequence[Sequence[str]]) -> None:
-        """表を表示・記録する.
+        """表を表示・記録する
 
         Args:
-            title: 表題。
-            columns: 列の見出し。
-            rows: 行 (各セルは文字列)。
+            title: 表題
+            columns: 列の見出し
+            rows: 行 (各セルは文字列)
         """
         self._add(
             {
@@ -221,10 +221,10 @@ class Report:
         console.print(t)
 
     def situation_tree(self, item: ItemTrace) -> None:
-        """状況の木を記録する (ビューア専用。ターミナルには節点の数だけ出す).
+        """状況の木を記録する (ビューア専用．ターミナルには節点の数だけ出す)
 
         Args:
-            item: 状況の木 (kind が ``"situation_tree"`` の内容)。
+            item: 状況の木 (kind が ``"situation_tree"`` の内容)
         """
         self._add(item)
         if item["kind"] == "situation_tree":
@@ -233,13 +233,13 @@ class Report:
     # -- 検査 ---------------------------------------------------------------
 
     def _check(self, check: CheckTrace) -> bool:
-        """検査結果を表示・記録し、期待と違えば失敗として数える.
+        """検査結果を表示・記録し，期待と違えば失敗として数える
 
         Args:
-            check: 検査結果。
+            check: 検査結果
 
         Returns:
-            期待どおりなら True。
+            期待どおりなら True
         """
         self._add({"kind": "check", "check": check})
         mark = "[green]✓[/green]" if check["ok"] else "[red]✗[/red]"
@@ -264,18 +264,18 @@ class Report:
         ref: str = "",
         detail: str = "",
     ) -> bool:
-        """一般の検査を表示・記録する.
+        """一般の検査を表示・記録する
 
         Args:
-            label: 何を検査したか。
-            ok: 期待どおりか。
-            actual: 実際の結果の表示。
-            expected: 期待した結果の表示。
-            ref: 本書での出典。
-            detail: 補足 (反例や理由など)。
+            label: 何を検査したか
+            ok: 期待どおりか
+            actual: 実際の結果の表示
+            expected: 期待した結果の表示
+            ref: 本書での出典
+            detail: 補足 (反例や理由など)
 
         Returns:
-            期待どおりなら True。
+            期待どおりなら True
         """
         return self._check(
             {
@@ -291,18 +291,18 @@ class Report:
     def expect_entailment(
         self, label: str, result: Entailment, expected: Verdict, *, ref: str = "", detail: str = ""
     ) -> bool:
-        """帰結判定の検査を表示・記録する.
+        """帰結判定の検査を表示・記録する
 
         Args:
-            label: 何を検査したか。
-            result: 帰結判定の結果。
-            expected: 期待した判定。
-            ref: 本書での出典。
-            detail: 補足 (反例や理由など)。
-                unknown のときは Z3 の理由を後ろに足す。
+            label: 何を検査したか
+            result: 帰結判定の結果
+            expected: 期待した判定
+            ref: 本書での出典
+            detail: 補足 (反例や理由など)
+                unknown のときは Z3 の理由を後ろに足す
 
         Returns:
-            期待どおりなら True。
+            期待どおりなら True
         """
         extra = f"\nZ3: {result.reason}" if result.reason else ""
         return self.expect(
@@ -323,17 +323,17 @@ class Report:
         ref: str = "",
         detail: str = "",
     ) -> bool:
-        """充足可能性の検査を表示・記録する.
+        """充足可能性の検査を表示・記録する
 
         Args:
-            label: 何を検査したか。
-            result: 充足可能性の判定結果。
-            expected: 期待した判定。
-            ref: 本書での出典。
-            detail: 補足 (反例や理由など)。
+            label: 何を検査したか
+            result: 充足可能性の判定結果
+            expected: 期待した判定
+            ref: 本書での出典
+            detail: 補足 (反例や理由など)
 
         Returns:
-            期待どおりなら True。
+            期待どおりなら True
         """
         return self.expect(
             label,
@@ -345,13 +345,13 @@ class Report:
         )
 
     def finish(self) -> ExampleTrace:
-        """検査の結果をまとめて表示する.
+        """検査の結果をまとめて表示する
 
         Returns:
-            この例題の記録。
+            この例題の記録
 
         Raises:
-            CheckFailedError: 期待と違う検査があったとき (記録は例外の ``trace`` に入る)。
+            CheckFailedError: 期待と違う検査があったとき (記録は例外の ``trace`` に入る)
         """
         checks = [
             it["check"]
@@ -370,7 +370,7 @@ class Report:
 
 
 def towers_text(state: StateTrace) -> str:
-    """ブロック世界の状態を ASCII で描く (下が机).
+    """ブロック世界の状態を ASCII で描く (下が机)
 
     例::
 
@@ -380,10 +380,10 @@ def towers_text(state: StateTrace) -> str:
         手: -
 
     Args:
-        state: ブロック世界の状態。
+        state: ブロック世界の状態
 
     Returns:
-        複数行の文字列 (塔、机の線、手に持っているブロック)。
+        複数行の文字列 (塔，机の線，手に持っているブロック)
     """
     towers = state["towers"]
     height = max((len(t) for t in towers), default=0)

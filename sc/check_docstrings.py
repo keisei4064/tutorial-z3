@@ -1,26 +1,35 @@
-"""docstring の検査 (Google 形式).
+"""docstring の検査 (Google 形式)
 
-ruff の pydocstyle (D) は公開 API の docstring の有無しか見ず、非公開の関数や
-ネストした関数は対象外で、Args などの節の有無も強制しない。そこで ast で次を検査する:
+ruff の pydocstyle (D) は公開 API の docstring の有無しか見ず，非公開の関数や
+ネストした関数は対象外で，Args などの節の有無も強制しない．そこで ast で次を検査する:
 
 - すべての関数・クラス (非公開・ネスト・dunder を含む) に docstring がある
-- 引数 (self / cls を除く) がある関数には ``Args:`` 節があり、すべての引数が載っている
+- 引数 (self / cls を除く) がある関数には ``Args:`` 節があり，すべての引数が載っている
 - 値を返す関数には ``Returns:`` 節がある (プロパティは属性として書くので除く)
 - ジェネレータには ``Yields:`` 節がある
-- 本体で例外を投げる関数には ``Raises:`` 節があり、その例外名が載っている
-- 公開属性を持つクラスには ``Attributes:`` 節があり、すべての公開属性が載っている
-  (クラス本体の注釈付きフィールド・代入 (Enum のメンバーなど) と、``__init__`` での
-  ``self.x = ...``。``_`` で始まる名前と ``__slots__`` は除く)
+- 本体で例外を投げる関数には ``Raises:`` 節があり，その例外名が載っている
+- 公開属性を持つクラスには ``Attributes:`` 節があり，すべての公開属性が載っている
+  (クラス本体の注釈付きフィールド・代入 (Enum のメンバーなど) と，``__init__`` での
+  ``self.x = ...``．``_`` で始まる名前と ``__slots__`` は除く)
+
+句読点の規則 (docstring とコメント．``# noqa:`` などの指示コメントは除く):
+
+- 読点・句点には全角の「，」「．」を使う (和文の読点・句点は使わない)
+- 行末に句読点 (「．」「，」「.」) を付けない (省略記号 ``...`` は除く)
+
+スタブ (``.pyi``) は句読点の規則だけを検査する
 
 使い方 (リポジトリのルートで)::
 
     uv run python -m sc.check_docstrings
 
-問題があれば一覧を表示して終了コード 1 で終わる。
+問題があれば一覧を表示して終了コード 1 で終わる
 """
 
 import ast
+import io
 import sys
+import tokenize
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -30,13 +39,13 @@ type FunctionNode = ast.FunctionDef | ast.AsyncFunctionDef
 
 
 def _own_nodes(func: FunctionNode) -> Iterator[ast.AST]:
-    """関数本体の節点のうち、ネストした関数・クラスの中身を除いたもの.
+    """関数本体の節点のうち，ネストした関数・クラスの中身を除いたもの
 
     Args:
-        func: 関数の節点。
+        func: 関数の節点
 
     Yields:
-        本体の節点 (ネストした関数・クラスの節点そのものは含むが、その中身は含まない)。
+        本体の節点 (ネストした関数・クラスの節点そのものは含むが，その中身は含まない)
 
     """
     stack: list[ast.AST] = list(func.body)
@@ -49,13 +58,13 @@ def _own_nodes(func: FunctionNode) -> Iterator[ast.AST]:
 
 
 def _parameters(func: FunctionNode) -> list[str]:
-    """docstring に書くべき引数名 (self / cls を除く).
+    """docstring に書くべき引数名 (self / cls を除く)
 
     Args:
-        func: 関数の節点。
+        func: 関数の節点
 
     Returns:
-        引数名のリスト。可変長引数は ``*args`` / ``**kwargs`` の形。
+        引数名のリスト．可変長引数は ``*args`` / ``**kwargs`` の形
 
     """
     args = func.args
@@ -68,13 +77,13 @@ def _parameters(func: FunctionNode) -> list[str]:
 
 
 def _returns_value(func: FunctionNode) -> bool:
-    """戻り値の注釈が None 以外か (ジェネレータは Yields で扱うので除く).
+    """戻り値の注釈が None 以外か (ジェネレータは Yields で扱うので除く)
 
     Args:
-        func: 関数の節点。
+        func: 関数の節点
 
     Returns:
-        ``Returns:`` 節が必要なら True。
+        ``Returns:`` 節が必要なら True
 
     """
     ann = func.returns
@@ -86,26 +95,26 @@ def _returns_value(func: FunctionNode) -> bool:
 
 
 def _is_generator(func: FunctionNode) -> bool:
-    """本体に yield を含むか.
+    """本体に yield を含むか
 
     Args:
-        func: 関数の節点。
+        func: 関数の節点
 
     Returns:
-        ジェネレータなら True。
+        ジェネレータなら True
 
     """
     return any(isinstance(n, (ast.Yield, ast.YieldFrom)) for n in _own_nodes(func))
 
 
 def _raised(func: FunctionNode) -> set[str]:
-    """本体で投げる例外のクラス名 (再送出 ``raise`` 単体は除く).
+    """本体で投げる例外のクラス名 (再送出 ``raise`` 単体は除く)
 
     Args:
-        func: 関数の節点。
+        func: 関数の節点
 
     Returns:
-        例外のクラス名の集合。
+        例外のクラス名の集合
 
     """
     names: set[str] = set()
@@ -121,27 +130,27 @@ def _raised(func: FunctionNode) -> set[str]:
 
 
 def _is_property(func: FunctionNode) -> bool:
-    """プロパティ (``@property``) か.
+    """プロパティ (``@property``) か
 
     Args:
-        func: 関数の節点。
+        func: 関数の節点
 
     Returns:
-        プロパティなら True。
+        プロパティなら True
 
     """
     return any(isinstance(d, ast.Name) and d.id == "property" for d in func.decorator_list)
 
 
 def _section(doc: str, name: str) -> str | None:
-    """docstring の節 (``Args:`` など) の本文.
+    """docstring の節 (``Args:`` など) の本文
 
     Args:
-        doc: docstring。
-        name: 節の名前 (``"Args"`` など)。
+        doc: docstring
+        name: 節の名前 (``"Args"`` など)
 
     Returns:
-        節の本文 (見出しの次の行から、次の見出しまで)。節がなければ None。
+        節の本文 (見出しの次の行から，次の見出しまで)．節がなければ None
 
     """
     lines = doc.splitlines()
@@ -162,14 +171,14 @@ def _section(doc: str, name: str) -> str | None:
 
 
 def _documents(section: str, name: str) -> bool:
-    """節の中に ``name:`` または ``name (型):`` の行があるか.
+    """節の中に ``name:`` または ``name (型):`` の行があるか
 
     Args:
-        section: 節の本文。
-        name: 引数名や例外名。
+        section: 節の本文
+        name: 引数名や例外名
 
     Returns:
-        載っていれば True。
+        載っていれば True
 
     """
     for line in section.splitlines():
@@ -180,14 +189,14 @@ def _documents(section: str, name: str) -> bool:
 
 
 def check_function(func: FunctionNode, where: str) -> list[str]:
-    """関数の docstring を検査する.
+    """関数の docstring を検査する
 
     Args:
-        func: 関数の節点。
-        where: 表示用の位置 (``ファイル:行 名前``)。
+        func: 関数の節点
+        where: 表示用の位置 (``ファイル:行 名前``)
 
     Returns:
-        問題の一覧 (なければ空)。
+        問題の一覧 (なければ空)
 
     """
     doc = ast.get_docstring(func)
@@ -222,13 +231,13 @@ def check_function(func: FunctionNode, where: str) -> list[str]:
 
 
 def _self_targets(init: ast.FunctionDef) -> list[str]:
-    """``__init__`` の中で ``self.x = ...`` / ``self.x: T = ...`` と代入する属性の名前.
+    """``__init__`` の中で ``self.x = ...`` / ``self.x: T = ...`` と代入する属性の名前
 
     Args:
-        init: ``__init__`` の節点。
+        init: ``__init__`` の節点
 
     Returns:
-        属性名のリスト (出現順、重複あり)。
+        属性名のリスト (出現順，重複あり)
 
     """
     names: list[str] = []
@@ -249,14 +258,14 @@ def _self_targets(init: ast.FunctionDef) -> list[str]:
 
 
 def _public_attributes(cls: ast.ClassDef) -> list[str]:
-    """クラスの公開属性の名前.
+    """クラスの公開属性の名前
 
     Args:
-        cls: クラスの節点。
+        cls: クラスの節点
 
     Returns:
-        クラス本体の注釈付きフィールド・代入の対象と、``__init__`` で ``self`` に代入する属性の名前
-        (``_`` で始まるものを除き、出現順、重複なし)。
+        クラス本体の注釈付きフィールド・代入の対象と，``__init__`` で ``self`` に代入する属性の名前
+        (``_`` で始まるものを除き，出現順，重複なし)
 
     """
     names: list[str] = []
@@ -271,14 +280,14 @@ def _public_attributes(cls: ast.ClassDef) -> list[str]:
 
 
 def check_class(cls: ast.ClassDef, where: str) -> list[str]:
-    """クラスの docstring を検査する.
+    """クラスの docstring を検査する
 
     Args:
-        cls: クラスの節点。
-        where: 表示用の位置 (``ファイル:行 名前``)。
+        cls: クラスの節点
+        where: 表示用の位置 (``ファイル:行 名前``)
 
     Returns:
-        問題の一覧 (なければ空)。
+        問題の一覧 (なければ空)
 
     """
     doc = ast.get_docstring(cls)
@@ -294,39 +303,104 @@ def check_class(cls: ast.ClassDef, where: str) -> list[str]:
     return [f"{where}: Attributes に載っていない属性: {', '.join(missing)}"] if missing else []
 
 
-def check_file(path: Path) -> list[str]:
-    """ファイル内のすべての関数・クラスを検査する.
+_DIRECTIVES = ("noqa", "type:", "pyright:", "fmt:")
+
+
+def punctuation_problems(text: str, where: str) -> list[str]:
+    """docstring やコメントの句読点の規則違反を探す
 
     Args:
-        path: Python ファイル。
+        text: docstring の中身，またはコメント (先頭の ``#`` を含む)
+        where: 表示用の位置
 
     Returns:
-        問題の一覧 (なければ空)。
+        問題の一覧 (なければ空)
 
     """
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    rel = path.relative_to(ROOT.parent)
     problems: list[str] = []
-    if ast.get_docstring(tree) is None:
+    for i, line in enumerate(text.splitlines()):
+        stripped = line.rstrip()
+        if "、" in stripped or "。" in stripped:
+            problems.append(
+                f"{where} (+{i}): 「、」「。」ではなく「，」「．」を使う: {stripped.strip()}"
+            )
+        if stripped.endswith(("．", "，", ".")) and not stripped.endswith("..."):
+            problems.append(f"{where} (+{i}): 行末の句読点は付けない: {stripped.strip()}")
+    return problems
+
+
+def _comment_problems(source: str, rel: Path) -> list[str]:
+    """ソース中のコメントの句読点を検査する
+
+    Args:
+        source: ソースコード
+        rel: 表示用のファイルパス
+
+    Returns:
+        問題の一覧 (なければ空)
+
+    """
+    problems: list[str] = []
+    for tok in tokenize.generate_tokens(io.StringIO(source).readline):
+        if tok.type != tokenize.COMMENT or tok.string[1:].lstrip().startswith(_DIRECTIVES):
+            continue
+        problems.extend(punctuation_problems(tok.string, f"{rel}:{tok.start[0]} コメント"))
+    return problems
+
+
+def check_file(path: Path) -> list[str]:
+    """ファイル内のすべての関数・クラスを検査する
+
+    Args:
+        path: Python ファイル
+
+    Returns:
+        問題の一覧 (なければ空)
+
+    """
+    source = path.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    rel = path.relative_to(ROOT.parent)
+    problems: list[str] = _comment_problems(source, rel)
+    module_doc = ast.get_docstring(tree)
+    if path.suffix == ".pyi":
+        # スタブは z3 の実装の形をなぞるだけなので，句読点の規則だけを検査する
+        docs = [module_doc] + [
+            ast.get_docstring(n)
+            for n in ast.walk(tree)
+            if isinstance(n, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+        ]
+        problems.extend(p for d in docs if d is not None for p in punctuation_problems(d, f"{rel}"))
+        return problems
+    if module_doc is None:
         problems.append(f"{rel}: モジュールの docstring がない")
+    else:
+        problems.extend(punctuation_problems(module_doc, f"{rel} モジュール"))
     for node in ast.walk(tree):
         where = f"{rel}:{getattr(node, 'lineno', 0)} {getattr(node, 'name', '')}"
         if isinstance(node, ast.ClassDef):
             problems.extend(check_class(node, where))
         elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             problems.extend(check_function(node, where))
+        else:
+            continue
+        doc = ast.get_docstring(node)
+        if doc is not None:
+            problems.extend(punctuation_problems(doc, where))
     return problems
 
 
 def main() -> int:
-    """sc/ 以下の .py をすべて検査する.
+    """sc/ 以下の .py をすべて検査する
 
     Returns:
-        終了コード (問題がなければ 0、あれば 1)。
+        終了コード (問題がなければ 0，あれば 1)
 
     """
     paths = sorted(
-        p for p in ROOT.rglob("*.py") if "out" not in p.parts and "__pycache__" not in p.parts
+        p
+        for p in ROOT.rglob("*.py*")
+        if p.suffix in {".py", ".pyi"} and "out" not in p.parts and "__pycache__" not in p.parts
     )
     problems = [msg for path in paths for msg in check_file(path)]
     for msg in problems:

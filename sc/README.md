@@ -40,7 +40,7 @@ uv run python -m sc.examples.blocks_world      # 例題を 1 つだけ実行
 ## 検証 (型・lint)
 
 ```sh
-.venv/bin/pyright -p sc                                            # strict。sc/pyrightconfig.json
+.venv/bin/pyright sc                                               # strict (ルートの pyproject.toml の [tool.pyright])
 .venv/bin/ruff check --config sc/ruff.toml sc                      # select = ["ALL"]
 .venv/bin/ruff format --config sc/ruff.toml --check sc
 MYPYPATH=sc/typings .venv/bin/stubtest z3 --ignore-missing-stub    # z3 スタブと実装の突き合わせ
@@ -49,12 +49,15 @@ MYPYPATH=sc/typings .venv/bin/stubtest z3 --ignore-missing-stub    # z3 スタ�
 
 - docstring は Google 形式 (Args / Returns / Yields / Raises / Attributes)。ruff の D ルールは
   公開 API しか見ないので、`check_docstrings.py` で非公開・ネストした関数・dunder・クラスの
-  属性まで検査している。
+  属性まで検査している。docstring とコメントの句読点 (読点は「，」、文中の句点は「．」、
+  行末には句読点を付けない) もこのスクリプトで検査する。
+- z3 は `import z3` して `z3.And(...)` のように参照する (`from z3 import ...` は使わない)。
 
 - z3-solver は型情報を同梱していないので、`typings/z3/__init__.pyi` に **sc/ で使う API だけ**
   の部分スタブを書いた。引数名・既定値は mypy の `stubtest` で実装と一致することを確かめている。
-- このスタブを全体に効かせると既存ノートブックの型検査が変わるので、`sc/` は独立した
-  pyright プロジェクト (`sc/pyrightconfig.json`) にしてある。ルートの設定は変更していない。
+- このスタブを全体に効かせると既存ノートブックの型検査が変わるので、ルートの `pyproject.toml` の
+  `[tool.pyright]` で `sc/` だけの実行環境 (`executionEnvironments`) を作り、そこでだけスタブを
+  優先して読ませている (VS Code の Pylance もこの設定で `sc/` を strict に検査する)。
 - ruff で無効にしているのは、日本語の全角文字 (RUF001–003)、式のコメントの誤検出 (ERA001)、
   「。」終わりの docstring (D400/D415) など。理由は `ruff.toml` のコメント参照。
 

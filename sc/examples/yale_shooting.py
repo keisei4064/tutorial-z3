@@ -1,23 +1,23 @@
-"""例 1: Yale Shooting Problem とフレーム問題 (§16.2, p.652–656).
+"""例 1: Yale Shooting Problem とフレーム問題 (§16.2, p.652–656)
 
-本書の流れに沿って、次を Z3 で確かめる:
+本書の流れに沿って，次を Z3 で確かめる:
 
-1. 効果公理 (16.29)–(16.30) と初期状態 (16.31) だけでは、
-   dead(do(shoot, do(wait, do(load, S0)))) は一階論理で帰結しない (フレーム問題)。
-2. McCarthy の一般フレーム公理 (16.28) + abnormal のサーカムスクリプション (p.653–654)。
-   ※ 本書の (16.28) は「真の持続」しか述べず、効果公理 (16.29)–(16.30) も abnormal に
-   触れない。この組み合わせでは abnormal が空のモデルが唯一の極小モデルで、異常は
-   起きない。Hanks と McDermott の定式化 (McCarthy 1986 に従い、効果公理が
-   「その変化は abnormal」とも述べる) にすると、極小な abnormal の集合が 2 つになり、
-   wait で弾が抜けるモデルが現れる。両方を Z3 で確かめる。
-3. 効果の完全な仕様 (p.654 の 6 つの公理) からは帰結する。
-4. Reiter の手続き (16.50) で効果公理から後継状態公理を作ると、
-   p.654 の完全な仕様と同値な基本行動理論が得られる。
+1. 効果公理 (16.29)–(16.30) と初期状態 (16.31) だけでは
+   dead(do(shoot, do(wait, do(load, S0)))) は一階論理で帰結しない (フレーム問題)
+2. McCarthy の一般フレーム公理 (16.28) + abnormal のサーカムスクリプション (p.653–654)
+   ※ 本書の (16.28) は「真の持続」しか述べず，効果公理 (16.29)–(16.30) も abnormal に
+   触れない．この組み合わせでは abnormal が空のモデルが唯一の極小モデルで，異常は
+   起きない．Hanks と McDermott の定式化 (McCarthy 1986 に従い，効果公理が
+   「その変化は abnormal」とも述べる) にすると，極小な abnormal の集合が 2 つになり
+   wait で弾が抜けるモデルが現れる．両方を Z3 で確かめる
+3. 効果の完全な仕様 (p.654 の 6 つの公理) からは帰結する
+4. Reiter の手続き (16.50) で効果公理から後継状態公理を作ると
+   p.654 の完全な仕様と同値な基本行動理論が得られる
 """
 
 from collections.abc import Callable
 
-from z3 import And, BoolSort, BoolVal, Function, Implies, Not, Or, is_true
+import z3
 
 from sc.sitcalc.axioms import (
     ActionPreconditionAxiom,
@@ -102,17 +102,19 @@ EFFECT_AXIOMS: tuple[EffectAxiom, ...] = (
 
 # (16.31) ¬loaded(S0) ∧ ¬dead(S0)
 INITIAL = InitialAxiom(
-    language=LANG, sentence=And(Not(holds(loaded, S0)), Not(holds(dead, S0))), ref="(16.31)"
+    language=LANG,
+    sentence=z3.And(z3.Not(holds(loaded, S0)), z3.Not(holds(dead, S0))),
+    ref="(16.31)",
 )
 
-# 本書は Poss を与えていない。どの行動も常に実行可能とする
+# 本書は Poss を与えていない．どの行動も常に実行可能とする
 PRECONDITIONS: tuple[ActionPreconditionAxiom, ...] = tuple(
     ActionPreconditionAxiom(
         language=LANG,
         action_symbol=sym,
         params=(),
         situation=s,
-        pi=BoolVal(True),
+        pi=z3.BoolVal(True),
         ref="—",
         note="本書には前提条件の記述がないので、常に実行可能とした",
     )
@@ -125,21 +127,21 @@ PRECONDITIONS: tuple[ActionPreconditionAxiom, ...] = tuple(
 
 
 def _complete_specification() -> tuple[Axiom, ...]:
-    """p.654 の効果の完全な仕様 (6 つの公理) を作る.
+    """p.654 の効果の完全な仕様 (6 つの公理) を作る
 
     Returns:
-        6 つの文 (s について全称閉包)。
+        6 つの文 (s について全称閉包)
     """
 
     def ax(phi: Formula, display: str) -> Sentence:
-        """s について全称閉包した文を作る.
+        """s について全称閉包した文を作る
 
         Args:
-            phi: s を自由変数に持つ論理式。
-            display: 表示用の文字列。
+            phi: s を自由変数に持つ論理式
+            display: 表示用の文字列
 
         Returns:
-            文。
+            文
         """
         return Sentence(ref="p.654", sentence=forall([s], phi), display=display)
 
@@ -148,7 +150,7 @@ def _complete_specification() -> tuple[Axiom, ...]:
         ax(holds(dead, do(load, s)) == holds(dead, s), "dead(do(load, s)) ≡ dead(s)"),
         ax(holds(loaded, do(shoot, s)) == holds(loaded, s), "loaded(do(shoot, s)) ≡ loaded(s)"),
         ax(
-            holds(dead, do(shoot, s)) == Or(holds(loaded, s), holds(dead, s)),
+            holds(dead, do(shoot, s)) == z3.Or(holds(loaded, s), holds(dead, s)),
             "dead(do(shoot, s)) ≡ loaded(s) ∨ dead(s)",
         ),
         ax(holds(loaded, do(wait, s)) == holds(loaded, s), "loaded(do(wait, s)) ≡ loaded(s)"),
@@ -162,53 +164,55 @@ COMPLETE_SPECIFICATION = _complete_specification()
 # (16.28) McCarthy の一般フレーム公理 (abnormal 付き)
 # ---------------------------------------------------------------------------
 
-abnormal = Function("abnormal", LANG.fluent_sort, LANG.action_sort, LANG.situation_sort, BoolSort())
+abnormal = z3.Function(
+    "abnormal", LANG.fluent_sort, LANG.action_sort, LANG.situation_sort, z3.BoolSort()
+)
 
 
 def ab(p: Fluent, act: Action, sit: Situation) -> Formula:
-    """``abnormal(p, a, s)`` を作る.
+    """``abnormal(p, a, s)`` を作る
 
     Args:
-        p: フルエントの項。
-        act: 行動の項。
-        sit: 状況の項。
+        p: フルエントの項
+        act: 行動の項
+        sit: 状況の項
 
     Returns:
-        論理式。
+        論理式
     """
     return as_formula(abnormal(p.expr, act.expr, sit.expr))
 
 
 def frame_axiom(p: Fluent, act: Action, sit: Situation) -> Formula:
-    """(16.28): ``Holds(p, s) ∧ ¬abnormal(p, a, s) ⊃ Holds(p, do(a, s))``.
+    """(16.28): ``Holds(p, s) ∧ ¬abnormal(p, a, s) ⊃ Holds(p, do(a, s))``
 
     (本書の式は ⊃ が脱落している)
 
     Args:
-        p: フルエントの項。
-        act: 行動の項。
-        sit: 状況の項。
+        p: フルエントの項
+        act: 行動の項
+        sit: 状況の項
 
     Returns:
-        論理式 (基礎例)。
+        論理式 (基礎例)
     """
-    return Implies(And(holds(p, sit), Not(ab(p, act, sit))), holds(p, do(act, sit)))
+    return z3.Implies(z3.And(holds(p, sit), z3.Not(ab(p, act, sit))), holds(p, do(act, sit)))
 
 
 def _circumscription_premises(
     *, effects_abnormal: bool
 ) -> tuple[list[Formula], list[Formula], list[str]]:
-    """物語の遷移 S0 -load→ S1 -wait→ S2 -shoot→ S3 に制限した基礎例と、最小化する原子.
+    """物語の遷移 S0 -load→ S1 -wait→ S2 -shoot→ S3 に制限した基礎例と，最小化する原子
 
-    Hanks–McDermott の議論 (p.654) は物語の上でのもの。物語の外の遷移まで含めると、
-    そこでの abnormal も最小化の対象になり、関係のない極小モデルが増える。
+    Hanks–McDermott の議論 (p.654) は物語の上でのもの．物語の外の遷移まで含めると
+    そこでの abnormal も最小化の対象になり，関係のない極小モデルが増える
 
     Args:
         effects_abnormal: 効果公理が「その変化は abnormal」とも述べるか
-            (ab(loaded, load, s) と loaded(s) ⊃ ab(dead, shoot, s))。
+            (ab(loaded, load, s) と loaded(s) ⊃ ab(dead, shoot, s))
 
     Returns:
-        (前提, 最小化する abnormal の原子, 原子の表示名) の組。
+        (前提, 最小化する abnormal の原子, 原子の表示名) の組
     """
     premises: list[Formula] = [INITIAL.formula]
     atoms: list[Formula] = []
@@ -216,10 +220,10 @@ def _circumscription_premises(
     for act, i in ((load, 0), (wait, 1), (shoot, 2)):
         sit_name, sit = NARRATIVE[i]
         premises.append(holds(loaded, do(load, sit)))  # (16.29)
-        premises.append(Implies(holds(loaded, sit), holds(dead, do(shoot, sit))))  # (16.30)
+        premises.append(z3.Implies(holds(loaded, sit), holds(dead, do(shoot, sit))))  # (16.30)
         if effects_abnormal:
             premises.append(ab(loaded, load, sit))
-            premises.append(Implies(holds(loaded, sit), ab(dead, shoot, sit)))
+            premises.append(z3.Implies(holds(loaded, sit), ab(dead, shoot, sit)))
         for p in (loaded, dead):
             premises.append(frame_axiom(p, act, sit))
             atoms.append(ab(p, act, sit))
@@ -230,21 +234,21 @@ def _circumscription_premises(
 def _possible_values(
     premises: list[Formula], atoms: list[Formula], true: tuple[int, ...], phi: Formula
 ) -> str:
-    """abnormal の外延がちょうど true であるモデルで、φ が取りうる値を調べる.
+    """abnormal の外延がちょうど true であるモデルで，φ が取りうる値を調べる
 
     Args:
-        premises: 前提。
-        atoms: abnormal の原子。
-        true: 真にする原子の添字 (それ以外は偽)。
-        phi: 調べる論理式。
+        premises: 前提
+        atoms: abnormal の原子
+        true: 真にする原子の添字 (それ以外は偽)
+        phi: 調べる論理式
 
     Returns:
-        ``"T"``、``"F"``、``"T/F"`` (両方取りうる) のいずれか。
+        ``"T"``，``"F"``，``"T/F"`` (両方取りうる) のいずれか
     """
-    exact = [atoms[i] if i in true else Not(atoms[i]) for i in range(len(atoms))]
+    exact = [atoms[i] if i in true else z3.Not(atoms[i]) for i in range(len(atoms))]
     values = [
         label
-        for label, q in (("T", phi), ("F", Not(phi)))
+        for label, q in (("T", phi), ("F", z3.Not(phi)))
         if satisfiable([*premises, *exact, q]).status is Satisfiability.SAT
     ]
     return "/".join(values)
@@ -256,13 +260,13 @@ def _possible_values(
 
 
 def _narrative_values(truth: Callable[[Formula], bool]) -> list[str]:
-    """物語の各状況での loaded と dead の値を、表のセルにする.
+    """物語の各状況での loaded と dead の値を，表のセルにする
 
     Args:
-        truth: 論理式の真偽を返す関数 (モデルの評価など)。
+        truth: 論理式の真偽を返す関数 (モデルの評価など)
 
     Returns:
-        状況ごとの ``loaded=T dead=F`` のような文字列。
+        状況ごとの ``loaded=T dead=F`` のような文字列
     """
     cells: list[str] = []
     for _, sit in NARRATIVE:
@@ -273,13 +277,13 @@ def _narrative_values(truth: Callable[[Formula], bool]) -> list[str]:
 
 
 def run() -> ExampleTrace:
-    """例題を実行する.
+    """例題を実行する
 
     Returns:
-        この例題の記録 (ビューア用。検査結果を含む)。
+        この例題の記録 (ビューア用．検査結果を含む)
 
     Raises:
-        CheckFailedError: 期待と違う検査があったとき (記録は例外の ``trace`` に入る)。
+        CheckFailedError: 期待と違う検査があったとき (記録は例外の ``trace`` に入る)
     """
     r = Report("yale_shooting", "例 1: Yale Shooting Problem とフレーム問題", "§16.2 (p.652–656)")
 
@@ -302,15 +306,15 @@ def run() -> ExampleTrace:
         m = effect_only.countermodel
 
         def truth_m(phi: Formula) -> bool:
-            """反例モデルでの論理式の真偽.
+            """反例モデルでの論理式の真偽
 
             Args:
-                phi: 論理式。
+                phi: 論理式
 
             Returns:
-                真なら True。
+                真なら True
             """
-            return is_true(m.eval(phi, model_completion=True))
+            return z3.is_true(m.eval(phi, model_completion=True))
 
         r.table(
             "反例モデル (物語の各状況でのフルエントの値)",
@@ -456,7 +460,7 @@ def run() -> ExampleTrace:
 
 
 def main() -> None:
-    """コマンドラインから実行する."""
+    """コマンドラインから実行する"""
     run()
 
 
