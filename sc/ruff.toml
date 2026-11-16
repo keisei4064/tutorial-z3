@@ -1,0 +1,40 @@
+# sc/ 専用の ruff 設定 (既存ノートブックには影響させない)
+target-version = "py313"
+line-length = 100
+extend-exclude = ["out"]
+
+[lint]
+select = ["ALL"]
+ignore = [
+  # 日本語のコメント・docstring で全角文字 (（）：、など) を使うため
+  "RUF001", "RUF002", "RUF003",
+  # 公理を "# Poss(stack(x, y), s) ≡ holding(x, s) ∧ clear(y, s)" のように
+  # 式として書くコメントが「コメントアウトされたコード」と誤検出されるため
+  "ERA001",
+  # 日本語の docstring は「。」で終わるため (D400/D415 は "." を要求する)
+  "D400", "D415",
+  # 日本語の docstring はコード上の名前 (pattern, abnormal など) で始まることがあり、
+  # 先頭を大文字にすると名前が変わってしまうため
+  "D403",
+  # D203/D212 は D211/D213 と排他。D211 (クラス直後に空行なし) と D212 を採用
+  "D203", "D213",
+  # ruff format との衝突回避
+  "COM812",
+  # 著作権表記は不要 (学習用リポジトリ)
+  "CPY001",
+]
+
+[lint.per-file-ignores]
+# スタブは z3 の実装に名前と形を合わせる必要がある (N802: 関数名 And/Or/ForAll など)
+"**/typings/**/*.pyi" = ["N802", "N803", "FBT001", "FBT002", "A002", "D", "PYI021", "ANN401"]
+
+[lint.pydocstyle]
+convention = "google"
+
+[lint.flake8-boolean-trap]
+# z3 の BoolVal(True) は真偽値の定数を作る API (位置引数が自然)
+extend-allowed-calls = ["z3.BoolVal"]
+
+[lint.pylint]
+# 公理のクラスや検査の関数は、本書の構成要素をそのままキーワード引数で受け取るため多め
+max-args = 8

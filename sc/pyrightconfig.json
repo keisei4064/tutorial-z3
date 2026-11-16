@@ -1,0 +1,11 @@
+{
+  "include": ["."],
+  "exclude": ["out", "**/__pycache__"],
+  "stubPath": "typings",
+  "typeCheckingMode": "strict",
+  "pythonVersion": "3.13",
+  "venvPath": "..",
+  "venv": ".venv",
+  "executionEnvironments": [{ "root": ".", "extraPaths": [".."] }],
+  "reportMissingModuleSource": "none"
+}

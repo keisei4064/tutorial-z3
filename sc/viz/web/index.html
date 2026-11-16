@@ -1,0 +1,446 @@
+<title>状況計算 on Z3</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+JP:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@700&display=swap">
+<style>
+/* レイアウト: 左に例題の目次、右に「証明ノート」として節を縦に並べる。状況の木は木と状態図の 2 列 */
+:root {
+  --bg: #f3f5f8;
+  --panel: #ffffff;
+  --ink: #18202b;
+  --muted: #5a6575;
+  --line: #d9dfe8;
+  --accent: #2b55c7;
+  --accent-soft: #e6ecfb;
+  --ok: #1d7a46;
+  --ok-soft: #e3f3e9;
+  --bad: #b8322a;
+  --bad-soft: #fbe7e5;
+  --warn: #9a6a12;
+  --warn-soft: #f8efdc;
+  --formula-bg: #f7f8fb;
+  --block: #dfe7f7;
+  --block-edge: #6f86b8;
+  --font-display: "Zen Kaku Gothic New", "Noto Sans JP", system-ui, sans-serif;
+  --font-body: "Noto Sans JP", system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", sans-serif;
+  --font-formula: "JetBrains Mono", "Cambria Math", "STIX Two Math", "Noto Sans Math", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #10141a; --panel: #161b23; --ink: #e4e9f0; --muted: #94a0b2; --line: #283141;
+    --accent: #84a6ff; --accent-soft: #1e2a45; --ok: #5fcb8b; --ok-soft: #16301f;
+    --bad: #f08a80; --bad-soft: #3a1c1a; --warn: #e4b45c; --warn-soft: #34290f;
+    --formula-bg: #121720; --block: #24324f; --block-edge: #7d97d6; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #10141a; --panel: #161b23; --ink: #e4e9f0; --muted: #94a0b2; --line: #283141;
+  --accent: #84a6ff; --accent-soft: #1e2a45; --ok: #5fcb8b; --ok-soft: #16301f;
+  --bad: #f08a80; --bad-soft: #3a1c1a; --warn: #e4b45c; --warn-soft: #34290f;
+  --formula-bg: #121720; --block: #24324f; --block-edge: #7d97d6; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--ink); }
+body {
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.7;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 48px;
+}
+h1, h2, h3 { font-family: var(--font-display); line-height: 1.35; text-wrap: balance; margin: 0; }
+h1 { font-size: 1.45rem; }
+h2 { font-size: 1.15rem; }
+h3 { font-size: 1rem; }
+.shell { max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 28px; }
+header.top { max-width: 1240px; margin: 0 auto 20px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; }
+header.top p { margin: 0; color: var(--muted); font-size: 0.85rem; }
+.source { font-size: 0.8rem; color: var(--muted); }
+
+/* 目次 */
+nav.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); align-self: start; display: flex; flex-direction: column; gap: 4px; }
+nav.toc .label { font-size: 0.72rem; letter-spacing: 0.08em; color: var(--muted); text-transform: uppercase; margin-bottom: 4px; }
+nav.toc a {
+  display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center;
+  padding: 8px 10px; border-radius: 8px; color: var(--ink); text-decoration: none; font-size: 0.9rem;
+}
+nav.toc a:hover { background: var(--accent-soft); }
+nav.toc a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+nav.toc a .ref { display: block; font-size: 0.72rem; color: var(--muted); font-weight: 400; }
+.count { font-family: var(--font-formula); font-size: 0.75rem; padding: 1px 7px; border-radius: 999px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.count.ok { background: var(--ok-soft); color: var(--ok); }
+.count.bad { background: var(--bad-soft); color: var(--bad); }
+
+main { min-width: 0; display: flex; flex-direction: column; gap: 22px; }
+.example-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.example-head .ref { color: var(--muted); font-size: 0.85rem; }
+section.sec { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+section.sec > header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+.chip { font-family: var(--font-formula); font-size: 0.72rem; color: var(--accent); background: var(--accent-soft); border-radius: 4px; padding: 0 6px; white-space: nowrap; }
+p.text { margin: 0; white-space: pre-wrap; max-width: 72ch; }
+pre.ascii { margin: 0; font-family: var(--font-formula); font-size: 0.85rem; line-height: 1.25; background: var(--formula-bg); border-radius: 6px; padding: 8px 12px; overflow-x: auto; }
+
+/* 式 */
+.formula { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.formula .head { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: 0.85rem; color: var(--muted); }
+.formula .head b { color: var(--ink); font-weight: 500; }
+.math { font-family: var(--font-formula); font-size: 0.86rem; background: var(--formula-bg); border-radius: 6px; padding: 8px 12px; overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
+
+/* 検査 */
+.check { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); }
+.check .mark { font-weight: 700; width: 1.6em; height: 1.6em; border-radius: 50%; display: grid; place-items: center; font-size: 0.85rem; }
+.check.ok .mark { background: var(--ok-soft); color: var(--ok); }
+.check.bad { border-color: var(--bad); }
+.check.bad .mark { background: var(--bad-soft); color: var(--bad); }
+.check .label { font-weight: 500; overflow-wrap: anywhere; }
+.check .meta { grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; font-size: 0.84rem; }
+.verdict { padding: 0 8px; border-radius: 999px; font-size: 0.78rem; white-space: nowrap; }
+.verdict.entailed { background: var(--ok-soft); color: var(--ok); }
+.verdict.refuted { background: var(--bad-soft); color: var(--bad); }
+.verdict.unknown { background: var(--warn-soft); color: var(--warn); }
+.verdict.other { background: var(--accent-soft); color: var(--accent); }
+.check .detail { grid-column: 2; color: var(--muted); font-size: 0.84rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* 理論 */
+.theory { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.theory > .name { font-weight: 700; }
+details.group { border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+details.group > summary { cursor: pointer; padding: 8px 12px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; list-style: none; }
+details.group > summary::-webkit-details-marker { display: none; }
+details.group > summary::before { content: "▸"; color: var(--muted); }
+details.group[open] > summary::before { content: "▾"; }
+details.group > summary .sym { font-family: var(--font-formula); font-weight: 600; color: var(--accent); }
+details.group > summary .gt { font-size: 0.86rem; }
+details.group > summary .n { margin-left: auto; font-size: 0.76rem; color: var(--muted); }
+.axioms { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; padding: 4px 12px 12px; }
+.axioms .r { font-family: var(--font-formula); font-size: 0.76rem; color: var(--muted); padding-top: 2px; white-space: nowrap; }
+.axioms .t { font-family: var(--font-formula); font-size: 0.84rem; overflow-wrap: anywhere; }
+.axioms .t .note { display: block; font-family: var(--font-body); color: var(--muted); font-size: 0.8rem; }
+.group-note { padding: 0 12px 10px; color: var(--muted); font-size: 0.8rem; }
+
+/* 表 */
+.tablewrap { overflow-x: auto; min-width: 0; }
+table.data { border-collapse: collapse; font-size: 0.84rem; min-width: 100%; }
+table.data caption { text-align: left; font-weight: 500; padding-bottom: 6px; }
+table.data th, table.data td { border-bottom: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
+table.data th { color: var(--muted); font-weight: 500; font-size: 0.78rem; white-space: nowrap; }
+table.data td { font-variant-numeric: tabular-nums; }
+
+/* 状況の木 */
+.sitview { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; min-width: 0; }
+.sitview .title { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; }
+.tree { border: 1px solid var(--line); border-radius: 8px; padding: 8px; max-height: 460px; overflow: auto; font-family: var(--font-formula); font-size: 0.8rem; }
+.tree ul { list-style: none; margin: 0; padding-left: 16px; border-left: 1px dashed var(--line); }
+.tree > ul { padding-left: 0; border-left: none; }
+.tree button {
+  font: inherit; color: var(--ink); background: none; border: 0; padding: 2px 6px; border-radius: 4px; cursor: pointer; text-align: left;
+  display: inline-flex; gap: 6px; align-items: center;
+}
+.tree button:hover { background: var(--accent-soft); }
+.tree button.sel { background: var(--accent); color: var(--panel); }
+.tree button.plan { font-weight: 600; color: var(--accent); }
+.tree button.plan.sel { color: var(--panel); }
+.tree .goal { color: var(--ok); font-size: 0.7rem; border: 1px solid currentColor; border-radius: 3px; padding: 0 3px; }
+.state { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.state .term { font-family: var(--font-formula); font-size: 0.8rem; background: var(--formula-bg); padding: 6px 10px; border-radius: 6px; overflow-x: auto; white-space: nowrap; }
+.stage { border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px 0; display: flex; flex-direction: column; gap: 8px; }
+.hand { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--muted); min-height: 42px; }
+.towers { display: flex; gap: 14px; align-items: flex-end; min-height: 130px; border-bottom: 3px solid var(--muted); padding: 0 6px; }
+.tower { display: flex; flex-direction: column-reverse; gap: 2px; }
+.blk { width: 40px; height: 36px; display: grid; place-items: center; background: var(--block); border: 1.5px solid var(--block-edge); border-radius: 4px; font-family: var(--font-formula); font-weight: 600; }
+.stage .floor { font-size: 0.72rem; color: var(--muted); padding: 2px 0 6px; }
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 10px; font-size: 0.82rem; }
+.kv .k { color: var(--muted); }
+.kv .v { font-family: var(--font-formula); overflow-wrap: anywhere; }
+.stepper { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 0.82rem; }
+.stepper button { font: inherit; padding: 4px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+.stepper button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.stepper button:disabled { opacity: 0.45; cursor: default; }
+button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.notice { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; max-width: 70ch; }
+.notice code { font-family: var(--font-formula); font-size: 0.85rem; background: var(--formula-bg); padding: 1px 5px; border-radius: 4px; }
+
+@media (max-width: 860px) {
+  .shell { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  nav.toc { position: static; flex-direction: row; overflow-x: auto; gap: 6px; padding-bottom: 4px; }
+  nav.toc .label { display: none; }
+  nav.toc a { flex: 0 0 auto; border: 1px solid var(--line); }
+  nav.toc a .ref { display: none; }
+  .sitview { grid-template-columns: minmax(0, 1fr); }
+  section.sec { padding: 14px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tree button, nav.toc a { transition: background-color 120ms ease; }
+}
+</style>
+
+<header class="top">
+  <h1>状況計算 on Z3</h1>
+  <p id="meta">F. Lin, “Situation Calculus”, Handbook of Knowledge Representation, Ch.16 の定式化を Z3 で検証した記録</p>
+</header>
+<div class="shell">
+  <nav class="toc" id="toc" aria-label="例題">
+    <div class="label">例題</div>
+  </nav>
+  <main id="main">
+    <div class="notice" id="loading"><h2>読み込み中</h2><p>trace.json を読み込んでいます。</p></div>
+  </main>
+</div>
+
+<script>
+"use strict";
+
+// ---------------------------------------------------------------------------
+// データの読み込み: 公開版は同じ階層の trace.json、手元では sc/out/trace.json
+// ---------------------------------------------------------------------------
+const CANDIDATES = ["trace.json", "../../out/trace.json"];
+let DATA = null;
+
+async function load() {
+  for (const url of CANDIDATES) {
+    try {
+      const res = await fetch(url, { cache: "no-store" });
+      if (res.ok) return await res.json();
+    } catch (_) { /* 次の候補へ */ }
+  }
+  return null;
+}
+
+function el(tag, attrs = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v === null || v === undefined || v === false) continue;
+    if (k === "class") node.className = v;
+    else if (k === "text") node.textContent = v;
+    else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+    else node.setAttribute(k, v === true ? "" : String(v));
+  }
+  for (const c of children.flat()) {
+    if (c === null || c === undefined || c === false) continue;
+    node.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  }
+  return node;
+}
+
+const slug = (id) => id.replace(/_/g, "-");
+const checksOf = (ex) => ex.sections.flatMap((s) => s.items.filter((i) => i.kind === "check").map((i) => i.check));
+
+function verdictClass(text) {
+  if (text.startsWith("帰結する") || text.startsWith("充足可能")) return "entailed";
+  if (text.startsWith("帰結しない") || text.startsWith("充足不能")) return "refuted";
+  if (text.startsWith("判定不能")) return "unknown";
+  return "other";
+}
+
+// ---------------------------------------------------------------------------
+// 目次
+// ---------------------------------------------------------------------------
+function renderToc(current) {
+  const toc = document.getElementById("toc");
+  toc.querySelectorAll("a").forEach((a) => a.remove());
+  for (const ex of DATA.examples) {
+    const checks = checksOf(ex);
+    const ok = checks.filter((c) => c.ok).length;
+    const a = el("a", { href: "#" + slug(ex.id), "aria-current": ex.id === current ? "page" : null },
+      el("span", {}, ex.title.replace(/^例 \d+: /, ""), el("span", { class: "ref", text: ex.ref })),
+      el("span", { class: "count " + (ok === checks.length ? "ok" : "bad"), text: `${ok}/${checks.length}` }));
+    toc.append(a);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 各要素
+// ---------------------------------------------------------------------------
+function renderText(item) {
+  return el("p", { class: "text", text: item.text });
+}
+
+function renderFormula(item) {
+  return el("div", { class: "formula" },
+    el("div", { class: "head" }, el("b", { text: item.label }), item.ref ? el("span", { class: "chip", text: item.ref }) : null),
+    el("div", { class: "math", text: item.text }));
+}
+
+function renderCheck({ check }) {
+  return el("div", { class: "check " + (check.ok ? "ok" : "bad") },
+    el("div", { class: "mark", text: check.ok ? "✓" : "✗", "aria-label": check.ok ? "期待どおり" : "期待と違う" }),
+    el("div", { class: "label" }, check.label, " ", check.ref ? el("span", { class: "chip", text: check.ref }) : null),
+    el("div", { class: "meta" },
+      el("span", { class: "verdict " + verdictClass(check.actual), text: check.actual }),
+      check.ok ? null : el("span", { text: "期待: " + check.expected })),
+    check.detail ? el("div", { class: "detail", text: check.detail }) : null);
+}
+
+const OPEN_GROUPS = new Set(["D_ss", "D_ap", "D_S0"]);
+
+function renderTheory(item) {
+  const groups = item.groups.map((g) => {
+    const single = item.groups.length === 1;
+    const rows = g.axioms.flatMap((a) => [
+      el("div", { class: "r", text: a.ref }),
+      el("div", { class: "t" }, a.text, a.note ? el("span", { class: "note", text: "↳ " + a.note }) : null),
+    ]);
+    return el("details", { class: "group", open: single || OPEN_GROUPS.has(g.symbol) },
+      el("summary", {},
+        single ? null : el("span", { class: "sym", text: g.symbol }),
+        el("span", { class: "gt", text: single ? g.ref : g.title }),
+        single ? null : el("span", { class: "chip", text: g.ref }),
+        el("span", { class: "n", text: `${g.axioms.length} 本` })),
+      g.axioms.length ? el("div", { class: "axioms" }, rows) : el("div", { class: "group-note", text: "(なし)" }),
+      g.note ? el("div", { class: "group-note", text: "※ " + g.note }) : null);
+  });
+  return el("div", { class: "theory" }, el("div", { class: "name", text: item.name }), groups);
+}
+
+function renderTable(item) {
+  return el("div", { class: "tablewrap" },
+    el("table", { class: "data" },
+      el("caption", { text: item.title }),
+      el("thead", {}, el("tr", {}, item.columns.map((c) => el("th", { text: c })))),
+      el("tbody", {}, item.rows.map((r) => el("tr", {}, r.map((c) => el("td", { text: c })))))));
+}
+
+// 状況の木: 左に木、右に選んだ状況の状態 (ブロックの塔)
+function renderTree(item) {
+  const byParent = new Map();
+  for (const n of item.nodes) {
+    const key = n.parent === null ? "root" : n.parent;
+    if (!byParent.has(key)) byParent.set(key, []);
+    byParent.get(key).push(n);
+  }
+  const planPath = item.nodes.filter((n) => n.on_plan).sort((a, b) => a.depth - b.depth)
+    .filter((n, i, arr) => i === 0 || n.parent === arr[i - 1].id);
+  let selected = item.nodes[0];
+  const buttons = new Map();
+  const statePane = el("div", { class: "state" });
+  const stepInfo = el("span");
+  const prev = el("button", { type: "button", text: "◀ 前の手", onclick: () => step(-1) });
+  const next = el("button", { type: "button", text: "次の手 ▶", onclick: () => step(1) });
+
+  function step(delta) {
+    const idx = planPath.findIndex((n) => n.id === selected.id);
+    const target = planPath[Math.max(0, Math.min(planPath.length - 1, (idx < 0 ? 0 : idx) + delta))];
+    select(target);
+  }
+
+  function branch(node) {
+    const btn = el("button", {
+      type: "button",
+      class: node.on_plan ? "plan" : null,
+      onclick: () => select(node),
+      "aria-pressed": "false",
+    }, node.action ?? "S0", node.goal ? el("span", { class: "goal", text: "goal" }) : null);
+    buttons.set(node.id, btn);
+    const kids = byParent.get(node.id) ?? [];
+    return el("li", {}, btn, kids.length ? el("ul", {}, kids.map(branch)) : null);
+  }
+
+  function select(node) {
+    selected = node;
+    for (const [id, b] of buttons) {
+      b.classList.toggle("sel", id === node.id);
+      b.setAttribute("aria-pressed", id === node.id ? "true" : "false");
+    }
+    const st = node.state;
+    const towers = el("div", { class: "towers" },
+      st.towers.map((t) => el("div", { class: "tower" }, t.map((b) => el("div", { class: "blk", text: b })))));
+    statePane.replaceChildren(
+      el("div", { class: "term", text: node.term, title: node.term }),
+      el("div", { class: "stage" },
+        el("div", { class: "hand" }, "手:", st.holding ? el("div", { class: "blk", text: st.holding }) : el("span", { text: "空" })),
+        towers,
+        el("div", { class: "floor", text: "机" })),
+      el("div", { class: "kv" },
+        el("div", { class: "k", text: "深さ" }), el("div", { class: "v", text: String(node.depth) }),
+        el("div", { class: "k", text: "成り立つフルエント" }), el("div", { class: "v", text: st.fluents.join(", ") || "(なし)" }),
+        el("div", { class: "k", text: "実行可能な行動" }), el("div", { class: "v", text: node.possible.join(", ") || "(なし)" }),
+        el("div", { class: "k", text: "ゴール" }), el("div", { class: "v", text: node.goal ? "達成" : "未達成" })));
+    const idx = planPath.findIndex((n) => n.id === node.id);
+    stepInfo.textContent = idx >= 0 ? `プランの ${idx} / ${planPath.length - 1} 手目` : "プランの外の状況";
+    prev.disabled = idx === 0;
+    next.disabled = idx === planPath.length - 1;
+  }
+
+  const roots = byParent.get("root") ?? [];
+  const view = el("div", { class: "sitview" },
+    el("div", { class: "title" }, el("h3", { text: item.title }), el("span", { class: "chip", text: "goal: " + item.goal })),
+    el("div", {},
+      el("div", { class: "tree", role: "tree" }, el("ul", {}, roots.map(branch)))),
+    el("div", { class: "state-col" },
+      el("div", { class: "stepper" }, prev, next, stepInfo),
+      statePane));
+  select(selected);
+  return view;
+}
+
+const RENDER = { text: renderText, formula: renderFormula, check: renderCheck, theory: renderTheory, table: renderTable, situation_tree: renderTree };
+
+// ascii の塔 (テキストの中の図) は等幅で表示する
+function renderItem(item) {
+  if (item.kind === "text" && /─/.test(item.text)) {
+    const [first, ...rest] = item.text.split("\n");
+    return el("div", { class: "formula" }, el("div", { class: "head" }, el("b", { text: first })), el("pre", { class: "ascii", text: rest.join("\n") }));
+  }
+  return (RENDER[item.kind] ?? renderText)(item);
+}
+
+function renderExample(ex) {
+  const checks = checksOf(ex);
+  const ok = checks.filter((c) => c.ok).length;
+  const main = document.getElementById("main");
+  main.replaceChildren(
+    el("div", { class: "example-head" },
+      el("h2", { text: ex.title }),
+      el("span", { class: "ref", text: ex.ref }),
+      el("span", { class: "count " + (ok === checks.length ? "ok" : "bad"), text: `検査 ${ok}/${checks.length} が期待どおり` })),
+    ...ex.sections.map((sec) => el("section", { class: "sec" },
+      sec.title ? el("header", {}, el("h2", { text: sec.title }), sec.ref ? el("span", { class: "chip", text: sec.ref }) : null) : null,
+      sec.items.map(renderItem))));
+}
+
+function route() {
+  const id = location.hash.replace(/^#/, "");
+  const ex = DATA.examples.find((e) => slug(e.id) === id) ?? DATA.examples[0];
+  renderToc(ex.id);
+  renderExample(ex);
+}
+
+function showMissing() {
+  document.getElementById("main").replaceChildren(el("div", { class: "notice" },
+    el("h2", { text: "trace.json が見つかりません" }),
+    el("p", {}, "リポジトリのルートで ", el("code", { text: "uv run python -m sc.run_all" }), " を実行すると sc/out/trace.json が作られます。"),
+    el("p", {}, "手元で見るときは ", el("code", { text: "uv run python -m http.server -d sc" }), " を起動し、", el("code", { text: "http://localhost:8000/viz/web/" }), " を開いてください。"),
+    el("p", {}, "または、trace.json をこのページにドラッグ＆ドロップするか、ここで選んでください: ",
+      el("input", { id: "file", type: "file", accept: "application/json,.json", onchange: (e) => readFile(e.target.files[0]) }))));
+}
+
+function readFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try { start(JSON.parse(String(reader.result))); }
+    catch (err) { alertInline("JSON として読めませんでした: " + err.message); }
+  };
+  reader.readAsText(file);
+}
+
+function alertInline(message) {
+  document.getElementById("main").prepend(el("div", { class: "notice", text: message }));
+}
+
+function start(data) {
+  DATA = data;
+  const meta = document.getElementById("meta");
+  meta.textContent = `${data.source} の定式化を Z3 で検証した記録 · 生成 ${data.generated}`;
+  window.addEventListener("hashchange", route);
+  route();
+}
+
+document.addEventListener("dragover", (e) => e.preventDefault());
+document.addEventListener("drop", (e) => { e.preventDefault(); readFile(e.dataTransfer?.files?.[0]); });
+
+load().then((data) => (data ? start(data) : showMissing()));
+</script>
